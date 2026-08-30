@@ -1,0 +1,17 @@
+# Secrets — never commit filled-in environment files
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Generated images and local scratch
+outputs/
+*.png
+!docs/**/*.png

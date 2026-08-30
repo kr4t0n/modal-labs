@@ -1,0 +1,206 @@
+{
+  "load_unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "ideogram4_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "Ideogram 4 (conditional)"
+    }
+  },
+  "late_cfg": {
+    "class_type": "CFGOverride",
+    "inputs": {
+      "model": [
+        "load_unet",
+        0
+      ],
+      "cfg": 3.0,
+      "start_percent": 0.7,
+      "end_percent": 1.0
+    },
+    "_meta": {
+      "title": "Late-step CFG override"
+    }
+  },
+  "load_unet_uncond": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "ideogram4_unconditional_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "Ideogram 4 (unconditional)"
+    }
+  },
+  "load_clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_8b_fp8_scaled.safetensors",
+      "type": "ideogram4",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "Qwen3-VL 8B text encoder"
+    }
+  },
+  "positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "load_clip",
+        0
+      ],
+      "text": "a vintage travel poster for the rings of Saturn, bold type reading 'SATURN'"
+    },
+    "_meta": {
+      "title": "Prompt"
+    }
+  },
+  "negative": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "positive",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Zeroed conditioning"
+    }
+  },
+  "guider": {
+    "class_type": "DualModelGuider",
+    "inputs": {
+      "model": [
+        "late_cfg",
+        0
+      ],
+      "positive": [
+        "positive",
+        0
+      ],
+      "cfg": 7.0,
+      "model_negative": [
+        "load_unet_uncond",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Dual-branch CFG"
+    }
+  },
+  "sampler": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "_meta": {
+      "title": "Sampler"
+    }
+  },
+  "sigmas": {
+    "class_type": "Ideogram4Scheduler",
+    "inputs": {
+      "steps": 20,
+      "width": 1024,
+      "height": 1024,
+      "mu": 0.0,
+      "std": 1.75
+    },
+    "_meta": {
+      "title": "Ideogram 4 schedule"
+    }
+  },
+  "noise": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 0
+    },
+    "_meta": {
+      "title": "Noise"
+    }
+  },
+  "latent": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "Empty latent"
+    }
+  },
+  "sample": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "noise",
+        0
+      ],
+      "guider": [
+        "guider",
+        0
+      ],
+      "sampler": [
+        "sampler",
+        0
+      ],
+      "sigmas": [
+        "sigmas",
+        0
+      ],
+      "latent_image": [
+        "latent",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Sample"
+    }
+  },
+  "load_vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "_meta": {
+      "title": "VAE"
+    }
+  },
+  "decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "sample",
+        0
+      ],
+      "vae": [
+        "load_vae",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Decode"
+    }
+  },
+  "save_image": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "decode",
+        0
+      ],
+      "filename_prefix": "ideogram4"
+    },
+    "_meta": {
+      "title": "Save"
+    }
+  }
+}

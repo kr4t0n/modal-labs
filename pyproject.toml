@@ -1,0 +1,46 @@
+[project]
+name = "modal-labs"
+version = "0.1.0"
+description = "Modal deployments for image and video generation models."
+requires-python = ">=3.11"
+dependencies = [
+    "modal==1.5.5",
+    "pillow==12.3.0",
+    "requests>=2.32",
+]
+
+[dependency-groups]
+dev = [
+    "fastapi>=0.141",
+    "httpx>=0.28",
+    "pre-commit>=4.6",
+    "pytest>=8.0",
+    "pytest-asyncio>=1.4.0",
+    "pytest-timeout>=2.4.0",
+    "pyyaml>=6.0.3",
+    "ruff>=0.16",
+    "websockets>=15",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# The custom node runs inside someone else's ComfyUI install, not this project's
+# environment, so it is linted but never type- or import-checked against uv.lock.
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    "E501",    # line length is handled by the formatter
+    "B008",    # FastAPI/argparse rely on calls in defaults
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["workflow", "server", "app"]
+
+[tool.pytest.ini_options]
+testpaths = ["ideogram4/tests"]
+asyncio_mode = "auto"
+# Concurrency tests must fail loudly rather than hang CI.
+timeout = 60
