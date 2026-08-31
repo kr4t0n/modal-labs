@@ -34,6 +34,20 @@ class GenerateRequest(BaseGenerateRequest):
         ),
     )
 
+    lora: str | None = Field(
+        default=None,
+        description=(
+            "Name of an adapter to layer onto the transformer. See /loras; "
+            "omit for the plain variant."
+        ),
+    )
+    lora_strength: float = Field(
+        default=workflow.DEFAULT_LORA_STRENGTH,
+        ge=-10.0,
+        le=10.0,
+        description="Ignored when no lora is named.",
+    )
+
     steps: int | None = Field(default=None, ge=1, le=200, description="Overrides the variant.")
     cfg: float | None = Field(default=None, ge=0.0, le=100.0, description="Overrides the variant.")
 
@@ -46,6 +60,8 @@ def _resolve(request: GenerateRequest) -> workflow.GenerationParams:
         request.prompt,
         negative_prompt=request.negative_prompt,
         variant=request.variant,
+        lora=request.lora,
+        lora_strength=request.lora_strength,
         width=width,
         height=height,
         seed=request.seed,
@@ -81,6 +97,15 @@ def _register_extra_routes(web_app: FastAPI) -> None:
                 for name, spec in workflow.VARIANTS.items()
             },
             "default": workflow.DEFAULT_VARIANT,
+            "loras": {
+                name: {
+                    "filename": spec.filename,
+                    "description": spec.description,
+                    "trained_on": spec.trained_on,
+                }
+                for name, spec in workflow.LORAS.items()
+            },
+            "default_lora_strength": workflow.DEFAULT_LORA_STRENGTH,
             "aspect_ratios": sorted(workflow.ASPECT_RATIOS),
             "resolution": {
                 "min": workflow.MIN_SIDE,

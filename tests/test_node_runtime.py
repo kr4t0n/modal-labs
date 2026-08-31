@@ -106,6 +106,8 @@ def test_both_services_register_their_nodes():
                 "override_sampler",
                 "steps",
                 "cfg",
+                "lora",
+                "lora_strength",
             ],
         ),
         (

@@ -35,6 +35,8 @@ def main() -> None:
     gen.add_argument(
         "--variant", default=workflow.DEFAULT_VARIANT, choices=sorted(workflow.VARIANTS)
     )
+    gen.add_argument("--lora", choices=sorted(workflow.LORAS), help="layer an adapter on top")
+    gen.add_argument("--lora-strength", type=float, default=workflow.DEFAULT_LORA_STRENGTH)
     gen.add_argument("--steps", type=int, help="overrides the variant default")
     gen.add_argument("--cfg", type=float, help="overrides the variant default")
     cli.add_geometry_arguments(gen, workflow.ASPECT_RATIOS)
@@ -61,6 +63,9 @@ def main() -> None:
         "variant": args.variant,
         **cli.geometry_payload(args),
     }
+    if args.lora:
+        payload["lora"] = args.lora
+        payload["lora_strength"] = args.lora_strength
     # Left unset, the server applies the variant's own steps/cfg.
     if args.steps is not None:
         payload["steps"] = args.steps

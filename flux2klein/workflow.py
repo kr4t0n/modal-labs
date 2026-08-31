@@ -119,6 +119,31 @@ DEFAULT_VARIANT = "base"
 
 
 @dataclass(frozen=True)
+class Lora:
+    """An adapter that can be layered onto the klein transformer."""
+
+    filename: str
+    description: str
+    # Adapters are trained against one transformer; applying to another is not
+    # an error, it just may not behave as trained.
+    trained_on: str = "base"
+
+
+# A registry rather than a free-form filename: the weights have to be fetched
+# ahead of time, so the set of usable adapters is known at deploy time. Adding
+# one means an entry here plus a ModelFile in app.py.
+LORAS: dict[str, Lora] = {
+    "snofs-v1.4": Lora(
+        filename="klein_snofs_v1_4.safetensors",
+        description="Ashen3 SNOFS v1.4 — a LoKr adapter trained on klein 9B.",
+    ),
+}
+
+# Upstream publishes no recommended strength, so this is the conventional 1.0.
+DEFAULT_LORA_STRENGTH = 1.0
+
+
+@dataclass(frozen=True)
 class GenerationParams:
     """Fully resolved sampler settings — no defaults left to the graph."""
 
@@ -127,6 +152,8 @@ class GenerationParams:
     variant: str
     checkpoint: str
     text_encoder: str
+    lora: str | None
+    lora_strength: float
     width: int
     height: int
     seed: int
@@ -145,6 +172,8 @@ def resolve_params(
     *,
     negative_prompt: str = "",
     variant: str = DEFAULT_VARIANT,
+    lora: str | None = None,
+    lora_strength: float = DEFAULT_LORA_STRENGTH,
     width: int = 1024,
     height: int = 1024,
     seed: int | None = None,
@@ -161,6 +190,8 @@ def resolve_params(
         raise WorkflowError(f"unknown variant {variant!r}; expected one of {sorted(VARIANTS)}")
     if batch_size < 1:
         raise WorkflowError("batch_size must be at least 1")
+    if lora is not None and lora not in LORAS:
+        raise WorkflowError(f"unknown lora {lora!r}; expected one of {sorted(LORAS)}")
 
     spec = VARIANTS[variant]
     resolved_steps = int(steps if steps is not None else spec.steps)
@@ -173,6 +204,8 @@ def resolve_params(
         variant=variant,
         checkpoint=spec.checkpoint,
         text_encoder=spec.text_encoder,
+        lora=lora,
+        lora_strength=float(lora_strength),
         width=snap_side(width),
         height=snap_side(height),
         seed=normalise_seed(seed),
@@ -187,9 +220,21 @@ def resolve_params(
 OUTPUT_NODE_ID = "save_image"
 
 
+LORA_NODE_ID = "load_lora"
+
+
 def build_workflow(params: GenerationParams) -> dict[str, Any]:
-    """Emit the API-format graph ComfyUI's ``POST /prompt`` accepts."""
-    return {
+    """Emit the API-format graph ComfyUI's ``POST /prompt`` accepts.
+
+    When an adapter is requested a `LoraLoaderModelOnly` is spliced between the
+    transformer and the guider. Model-only is deliberate: these adapters patch
+    `diffusion_model.*` alone, and the text encoder is loaded separately here.
+    """
+    # Without a LoRA the graph must be byte-identical to what it emitted before
+    # the feature existed; the committed reference graph pins that.
+    model_source = ["load_unet", 0] if params.lora is None else [LORA_NODE_ID, 0]
+
+    graph: dict[str, Any] = {
         "load_unet": {
             "class_type": "UNETLoader",
             "inputs": {"unet_name": params.checkpoint, "weight_dtype": "default"},
@@ -217,7 +262,7 @@ def build_workflow(params: GenerationParams) -> dict[str, Any]:
         "guider": {
             "class_type": "CFGGuider",
             "inputs": {
-                "model": ["load_unet", 0],
+                "model": model_source,
                 "positive": ["positive", 0],
                 "negative": ["negative", 0],
                 "cfg": params.cfg,
@@ -282,3 +327,16 @@ def build_workflow(params: GenerationParams) -> dict[str, Any]:
             "_meta": {"title": "Save"},
         },
     }
+
+    if params.lora is not None:
+        graph[LORA_NODE_ID] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {
+                "model": ["load_unet", 0],
+                "lora_name": LORAS[params.lora].filename,
+                "strength_model": params.lora_strength,
+            },
+            "_meta": {"title": f"LoRA: {params.lora}"},
+        }
+
+    return graph

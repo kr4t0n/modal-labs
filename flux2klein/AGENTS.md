@@ -46,6 +46,22 @@ state dict to `TEModel.QWEN3_8B`, which under `CLIPType.FLUX2` routes to
 lands on the same encoder for FLUX2, so the load works whether or not the
 donor checkpoint kept its visual tower.
 
+**Adapters are a registry, not a filename.** `lora` names an entry in `LORAS`
+rather than accepting an arbitrary file, because the weights must already be on
+the Volume when a request arrives — a free-form name would validate and then
+fail at queue time. Each entry pairs with a `ModelFile` in `app.py`, and a test
+asserts the two stay in step.
+
+The adapter is spliced in as `LoraLoaderModelOnly` between `UNETLoader` and
+`CFGGuider`, and only when one is requested: with `lora=None` the emitted graph
+is byte-identical to what it was before the feature, which the committed
+reference graph pins. Model-only is deliberate — these adapters patch
+`diffusion_model.*` and the text encoder is a separate load here.
+
+Note the widget order in the ComfyUI node: `lora` and `lora_strength` are
+appended at the *tail* of `required`. ComfyUI matches widget values by position,
+so inserting mid-list would shift every value in workflows people have saved.
+
 **Natural-language prompts.** No structured-caption requirement, unlike Ideogram
 4. There is no `/caption-template` endpoint here.
 

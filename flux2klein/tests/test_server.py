@@ -96,3 +96,37 @@ async def test_variants_endpoint_reports_sampler_defaults(wired):
     assert body["variants"]["base"]["steps"] == 20
     assert body["variants"]["distilled"]["steps"] == 4
     assert body["default"] == "base"
+
+
+@pytest.mark.asyncio
+async def test_lora_is_forwarded_into_the_submitted_graph(wired):
+    _, client, state = wired
+    await client.post(
+        "/generate", json={"prompt": "a test", "lora": "snofs-v1.4", "lora_strength": 0.7}
+    )
+    submitted = state["prompts"][0]["prompt"]
+    node = submitted[workflow.LORA_NODE_ID]
+    assert node["inputs"]["strength_model"] == 0.7
+    assert submitted["guider"]["inputs"]["model"] == [workflow.LORA_NODE_ID, 0]
+
+
+@pytest.mark.asyncio
+async def test_omitting_the_lora_submits_the_plain_graph(wired):
+    _, client, state = wired
+    await client.post("/generate", json={"prompt": "a test"})
+    assert workflow.LORA_NODE_ID not in state["prompts"][0]["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_unknown_lora_is_rejected(wired):
+    _, client, _ = wired
+    response = await client.post("/generate", json={"prompt": "x", "lora": "nope"})
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_variants_endpoint_lists_available_loras(wired):
+    _, client, _ = wired
+    body = (await client.get("/variants")).json()
+    assert "snofs-v1.4" in body["loras"]
+    assert body["default_lora_strength"] == workflow.DEFAULT_LORA_STRENGTH

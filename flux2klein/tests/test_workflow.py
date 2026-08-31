@@ -196,3 +196,56 @@ def test_graph_matches_the_committed_reference():
     """
     built = workflow.build_workflow(workflow.resolve_params(**GOLDEN_PARAMS))
     assert built == json.loads(GOLDEN.read_text(encoding="utf-8"))
+
+
+# --- LoRA adapters ----------------------------------------------------------
+
+
+def test_no_lora_leaves_the_graph_untouched():
+    """The feature must be inert when unused; the golden graph pins this too."""
+    graph = graph_for()
+    assert workflow.LORA_NODE_ID not in graph
+    assert graph["guider"]["inputs"]["model"] == ["load_unet", 0]
+
+
+def test_lora_is_spliced_between_the_transformer_and_the_guider():
+    graph = graph_for(lora="snofs-v1.4", lora_strength=0.8)
+    node = graph[workflow.LORA_NODE_ID]
+    assert node["class_type"] == "LoraLoaderModelOnly"
+    assert node["inputs"]["model"] == ["load_unet", 0]
+    assert node["inputs"]["lora_name"] == workflow.LORAS["snofs-v1.4"].filename
+    assert node["inputs"]["strength_model"] == 0.8
+    # The guider must read the patched model, not the raw loader.
+    assert graph["guider"]["inputs"]["model"] == [workflow.LORA_NODE_ID, 0]
+
+
+def test_lora_does_not_touch_the_text_encoder_path():
+    """Model-only: these adapters patch diffusion_model.* and nothing else."""
+    graph = graph_for(lora="snofs-v1.4")
+    assert graph["positive"]["inputs"]["clip"] == ["load_clip", 0]
+    assert graph["negative"]["inputs"]["clip"] == ["load_clip", 0]
+
+
+@pytest.mark.parametrize("variant", ["base", "distilled", "ponpoke-uncensored"])
+def test_lora_applies_to_every_variant(variant):
+    graph = graph_for(variant=variant, lora="snofs-v1.4")
+    assert graph["guider"]["inputs"]["model"] == [workflow.LORA_NODE_ID, 0]
+    assert graph[workflow.LORA_NODE_ID]["inputs"]["model"] == ["load_unet", 0]
+
+
+def test_unknown_lora_rejected():
+    with pytest.raises(workflow.WorkflowError, match="unknown lora"):
+        workflow.resolve_params("x", lora="not-a-real-adapter")
+
+
+def test_default_lora_strength_applied():
+    params = workflow.resolve_params("x", lora="snofs-v1.4")
+    assert params.lora_strength == workflow.DEFAULT_LORA_STRENGTH
+
+
+def test_every_link_still_resolves_with_a_lora():
+    graph = graph_for(lora="snofs-v1.4")
+    for node_id, node in graph.items():
+        for name, value in node["inputs"].items():
+            if isinstance(value, list):
+                assert value[0] in graph, f"{node_id}.{name} -> missing {value[0]!r}"

@@ -78,6 +78,11 @@ genuinely supported because that graph encodes it separately.
 Leave `override_sampler` off and the server applies those defaults. Pushing the
 distilled variant above cfg 1 degrades it rather than sharpening it.
 
+`lora` layers an adapter onto the transformer — `none` for the plain variant.
+Adapters are model-only, so they compose with any variant including
+`ponpoke-uncensored`. The dropdown mirrors the deployment's registry; `GET
+/variants` is authoritative if they diverge.
+
 **WAI-illustrious (Modal)** → `IMAGE`, `INT` (seed), `STRING` (info)
 
 Danbooru tags rather than prose: `1girl, solo, silver hair, masterpiece`. Full

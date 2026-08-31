@@ -19,6 +19,10 @@ ENV_URL = "FLUX2KLEIN_MODAL_URL"
 CATEGORY = "FLUX.2 klein (Modal)"
 VARIANTS = ["base", "distilled", "ponpoke-uncensored"]
 
+# "none" rather than an empty string so the dropdown reads clearly. Mirrors the
+# service's registry; /variants is the authoritative list.
+LORAS = ["none", "snofs-v1.4"]
+
 
 class Flux2KleinModal:
     """Text to image on the remote FLUX.2 klein 9B deployment."""
@@ -59,6 +63,14 @@ class Flux2KleinModal:
                 ),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 200}),
                 "cfg": ("FLOAT", {"default": 5.0, "min": 0.0, "max": 100.0, "step": 0.1}),
+                # Appended at the tail: ComfyUI matches widget values by
+                # position, so inserting mid-list would shift every value in
+                # workflows people have already saved.
+                "lora": (LORAS, {"default": "none"}),
+                "lora_strength": (
+                    "FLOAT",
+                    {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.05},
+                ),
             },
             "optional": endpoint_inputs(ENV_URL),
             # Lets the progress bar attach to this node rather than the graph.
@@ -85,6 +97,8 @@ class Flux2KleinModal:
         override_sampler: bool,
         steps: int,
         cfg: float,
+        lora: str = "none",
+        lora_strength: float = 1.0,
         endpoint: str = "",
         timeout_s: float = 900.0,
         unique_id: str | None = None,
@@ -107,6 +121,9 @@ class Flux2KleinModal:
         if override_sampler:
             payload["steps"] = steps
             payload["cfg"] = cfg
+        if lora != "none":
+            payload["lora"] = lora
+            payload["lora_strength"] = lora_strength
 
         with ProgressMirror(url, client_id, unique_id):
             result = post(url, "/generate", payload, timeout_s)
@@ -115,6 +132,8 @@ class Flux2KleinModal:
         notes = ""
         if variant == "distilled" and negative_prompt.strip():
             notes = " (negative prompt ignored: distilled variant)"
+        if params.get("lora"):
+            notes += f" lora={params['lora']}@{params.get('lora_strength')}"
         info = (
             f"{params.get('variant')} seed={params.get('seed')} "
             f"steps={params.get('steps')} cfg={params.get('cfg')} "

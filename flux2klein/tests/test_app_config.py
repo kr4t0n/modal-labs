@@ -65,3 +65,15 @@ def test_gated_repos_are_flagged():
         "black-forest-labs/FLUX.2-klein-9b-fp8",
         "ponpoke/flux2-klein-9b-uncensored-text-encoder",
     }
+
+
+def test_every_registered_lora_is_downloaded():
+    """A registry entry with no ModelFile validates locally and 404s remotely."""
+    destinations = {m.destination for m in app.MODEL_FILES}
+    for spec in workflow.LORAS.values():
+        assert f"loras/{spec.filename}" in destinations
+
+
+def test_loras_folder_is_a_configured_search_path():
+    section = yaml.safe_load(app.EXTRA_MODEL_PATHS_YAML)["flux2klein"]
+    assert section["loras"] == "loras"

@@ -72,7 +72,7 @@ uv run modal secret create huggingface-secret HF_TOKEN=hf_...
 **3. Pull the weights and deploy:**
 
 ```bash
-uv run modal run app.py::download_models   # ~44 GB into a Volume. One-off.
+uv run modal run app.py::download_models   # ~45 GB into a Volume. One-off.
 uv run modal deploy app.py
 ```
 
@@ -92,6 +92,35 @@ export FLUX2KLEIN_MODAL_URL=https://<workspace>--flux2klein-comfyui-flux2klein-w
 export MODAL_KEY=wk-...
 export MODAL_SECRET=ws-...
 ```
+
+## LoRA adapters
+
+An adapter can be layered onto the transformer for any variant. Omit `lora` and
+the graph is exactly what it was before the feature existed.
+
+| Name | What it is |
+| --- | --- |
+| `snofs-v1.4` | [Ashen3 SNOFS v1.4](https://huggingface.co/Ashen3/SNOFS) — a LoKr adapter trained on klein 9B |
+
+```bash
+uv run python client.py generate "..." --lora snofs-v1.4 --lora-strength 0.8
+```
+
+`GET /variants` lists the registry alongside the variants. Adapters are applied
+**model-only**: they patch the transformer, not the text encoder, so they compose
+with `ponpoke-uncensored` as readily as with `base`.
+
+Adding another means two lines — an entry in `LORAS` in `workflow.py` and a
+matching `ModelFile` in `app.py`, so the weights are on the Volume before a
+request can name them. A test asserts those two stay in step.
+
+> **`snofs-v1.4` licence.** Ashen3 releases SNOFS under a *Model Personal Use
+> License (No Service, No Derivatives, No Redistribution)*. It permits local use
+> and selling the images, but prohibits running the model as a service — its
+> definition of "Commercial Service Use" explicitly names APIs and hosted
+> workflows, whether or not money changes hands. A private single-user
+> deployment is a judgement call; anything multi-user or public needs a paid
+> licence from the author. The other weights here are unaffected.
 
 ## Using it from ComfyUI
 
@@ -134,7 +163,9 @@ uv run modal run app.py --prompt "a brutalist library at golden hour" --variant 
 | --- | --- | --- |
 | `prompt` | — | Natural language |
 | `negative_prompt` | `""` | Base variant only |
-| `variant` | `base` | `base` or `distilled` |
+| `variant` | `base` | `base`, `distilled` or `ponpoke-uncensored` |
+| `lora` | — | Adapter name from `/variants`; omit for none |
+| `lora_strength` | 1.0 | Ignored when no `lora` is named |
 | `width`, `height` | 1024 | 256–2048, snapped to /16 |
 | `aspect_ratio` | — | `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `9:16`, `16:9`, `21:9`; overrides width/height |
 | `megapixels` | 1.0 | Pixel budget used with `aspect_ratio` |

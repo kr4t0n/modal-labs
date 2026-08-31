@@ -89,6 +89,14 @@ MODEL_FILES = (
         "vae/full_encoder_small_decoder.safetensors",
         gated=False,
     ),
+    # Adapters. Small enough that fetching them unconditionally costs little,
+    # and a request naming one must not have to wait for a download.
+    ModelFile(
+        "Ashen3/SNOFS",
+        "Klein9b/klein_snofs_v1_4.safetensors",
+        "loras/klein_snofs_v1_4.safetensors",
+        gated=False,
+    ),
 )
 
 # Downloads land here first and are then renamed into place. Same Volume, so the
@@ -98,7 +106,7 @@ STAGING_DIR = f"{MODELS_DIR}/.staging"
 REQUIRED_MODELS = tuple(model.destination for model in MODEL_FILES)
 
 EXTRA_MODEL_PATHS_YAML = service.extra_model_paths_yaml(
-    "flux2klein", ("diffusion_models", "text_encoders", "vae")
+    "flux2klein", ("diffusion_models", "text_encoders", "vae", "loras")
 )
 
 # One transformer and one encoder are resident at a time: ~18 GB for base and
