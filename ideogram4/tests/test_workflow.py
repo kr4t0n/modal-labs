@@ -165,3 +165,23 @@ def test_suite_imported_this_projects_modules():
     """
     assert Path(workflow.__file__).resolve().parent == Path(__file__).resolve().parents[1]
     assert Path(server.__file__).resolve().parent == Path(__file__).resolve().parents[1]
+
+
+GOLDEN = Path(__file__).resolve().parents[1] / "workflows" / "ideogram4_t2i_api.json"
+GOLDEN_PARAMS = {
+    "prompt": "a vintage travel poster for the rings of Saturn, bold type reading 'SATURN'",
+    "width": 1024,
+    "height": 1024,
+    "seed": 0,
+    "preset": "Default",
+}
+
+
+def test_graph_matches_the_committed_reference():
+    """Pins the emitted graph byte-for-byte against workflows/*.json.
+
+    The reference file is what users POST directly, so it must not drift. It
+    doubles as an equivalence check when this module is refactored.
+    """
+    built = workflow.build_workflow(workflow.resolve_params(**GOLDEN_PARAMS))
+    assert built == json.loads(GOLDEN.read_text(encoding="utf-8"))

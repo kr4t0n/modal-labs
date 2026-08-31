@@ -9,7 +9,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -21,14 +20,6 @@ for _shared in ("workflow", "server", "app"):
 
 import app  # noqa: E402
 import workflow  # noqa: E402
-
-
-def test_build_commands_are_single_line():
-    """A multi-line RUN entry produces a Dockerfile that will not parse."""
-    with pytest.raises(ValueError, match="spans multiple lines"):
-        app._single_line("echo one", "printf 'a\nb' > /tmp/x")
-
-    assert app._single_line("echo one", "echo two") == ("echo one", "echo two")
 
 
 def test_extra_model_paths_is_valid_yaml_for_the_volume():

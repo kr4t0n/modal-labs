@@ -13,8 +13,18 @@ environment and tooling.
 | [`flux2klein/`](flux2klein/) | FLUX.2 [klein] 9B text-to-image, same pattern — natural-language prompts, base and 4-step distilled variants |
 
 Both expose one URL that is simultaneously a real ComfyUI server and a typed
-`/generate` contract, and both ship a custom node so a CPU-only ComfyUI can stay
-the UI while the GPU work happens on Modal.
+`/generate` contract, so a CPU-only ComfyUI can stay the UI while the GPU work
+happens on Modal.
+
+## Shared code
+
+| Directory | What it is |
+| --- | --- |
+| [`comfyui_modal/`](comfyui_modal/) | The container image, ComfyUI supervisor, ASGI proxy, resolution arithmetic, CLI transport and test doubles that every service uses |
+| [`comfy_node/`](comfy_node/) | One ComfyUI custom-node package covering every deployment — install it once, get every model's node |
+
+A service supplies only what is genuinely model-specific: its graph, its weight
+table, and a handful of request fields.
 
 ## Setup
 

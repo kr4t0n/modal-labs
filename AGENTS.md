@@ -11,12 +11,23 @@ directories, not installable packages:
 ```
 modal-labs/
 ├── pyproject.toml        one environment, ruff + pytest config
+├── comfyui_modal/        shared: image, supervisor, ASGI proxy, CLI, test doubles
+├── comfy_node/           shared: one ComfyUI node package for every service
+├── tests/                tests for the shared code
 ├── .github/workflows/    lint, format, test, import-check every Modal app
 └── <project>/
     ├── app.py            the Modal entrypoint — `modal deploy <project>/app.py`
+    ├── server.py         request model, resolver, service-specific routes
+    ├── workflow.py       the model's graph, in ComfyUI API format
     ├── README.md         how to run it
     └── AGENTS.md         why it is built that way
 ```
+
+**A service owns its model, not its plumbing.** Adding one means writing a
+`workflow.py`, a weight table, and a request model — a few hundred lines. If you
+find yourself copying the proxy, the supervisor or the progress mirror, extend
+the shared package instead: those encode bugs found the hard way, and duplicated
+copies lose the fixes one at a time.
 
 The root environment holds only what runs *locally* (`modal`, a CLI client's
 dependencies, dev tools). Everything a container needs is declared in that
@@ -64,10 +75,16 @@ Within pytest the same collision is handled by each test module clearing those
 names from `sys.modules` before importing, plus a guard test asserting it bound
 its own project's copy. Without it a suite silently tests the wrong project.
 
-## Adding a service
+## Guarding the shared layer
 
-Services are currently near-copies of each other: only `workflow.py`, the weight
-table and a few request fields are model-specific. That was acceptable at two.
-Before adding a third, extract the shared Modal wiring, ASGI layer and node
-runtime into one place — the proxy, progress mirror and build guards all encode
-bugs found the hard way, and maintaining N copies of them will lose those fixes.
+Two habits keep the extraction honest:
+
+**Golden graphs.** Each service commits a reference graph under `workflows/` and
+a test asserting `build_workflow` still emits exactly it. That file is what users
+POST directly, so it must not drift — and it doubles as the equivalence check
+whenever the shared code underneath is refactored.
+
+**Pinned node contracts.** `tests/test_node_runtime.py` pins every ComfyUI node
+id and its widget names *in order*. Those are what a saved workflow JSON
+references, so renaming or reordering one silently breaks every workflow a user
+has saved.

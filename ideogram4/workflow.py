@@ -21,10 +21,37 @@ Graph shape (all nodes are ComfyUI core, no custom node packs)::
 
 from __future__ import annotations
 
-import math
-import random
 from dataclasses import asdict, dataclass
 from typing import Any
+
+from comfyui_modal.geometry import (
+    ASPECT_RATIOS,
+    MAX_SEED,
+    MAX_SIDE,
+    MIN_SIDE,
+    SIDE_MULTIPLE,
+    WorkflowError,
+    normalise_seed,
+    resolution_for,
+    snap_side,
+)
+
+# Re-exported so callers and tests can treat this module as the single place
+# that describes one model's graph, geometry included.
+__all__ = [
+    "ASPECT_RATIOS",
+    "MAX_SEED",
+    "MAX_SIDE",
+    "MIN_SIDE",
+    "OUTPUT_NODE_ID",
+    "SIDE_MULTIPLE",
+    "GenerationParams",
+    "WorkflowError",
+    "build_workflow",
+    "resolution_for",
+    "resolve_params",
+    "snap_side",
+]
 
 # --- Weight files -----------------------------------------------------------
 # Every file lives in the Comfy-Org/Ideogram-4 repo; see app.py for the mirror.
@@ -50,58 +77,6 @@ DEFAULT_PRESET = "Default"
 DEFAULT_CFG = 7.0
 DEFAULT_LATE_CFG = 3.0
 DEFAULT_LATE_CFG_START = 0.7
-
-# --- Resolution -------------------------------------------------------------
-# The model is trained for any side in [256, 2048] that is a multiple of 16.
-MIN_SIDE = 256
-MAX_SIDE = 2048
-SIDE_MULTIPLE = 16
-
-# Mirrors ComfyUI's ResolutionSelector node so the ratios offered by the remote
-# API are the same ones the local UI offers.
-ASPECT_RATIOS: dict[str, tuple[int, int]] = {
-    "1:1": (1, 1),
-    "2:3": (2, 3),
-    "3:2": (3, 2),
-    "3:4": (3, 4),
-    "4:3": (4, 3),
-    "9:16": (9, 16),
-    "16:9": (16, 9),
-    "21:9": (21, 9),
-}
-
-MAX_SEED = 0xFFFFFFFFFFFFFFFF
-
-
-class WorkflowError(ValueError):
-    """Raised when generation parameters cannot produce a valid graph."""
-
-
-def snap_side(value: int) -> int:
-    """Round a side up to the multiple of 16 the model expects.
-
-    Matches the template's `max(((a + 15) // 16) * 16, 256)` expression, then
-    clamps to the trained maximum so a typo cannot request a 8k latent.
-    """
-    snapped = max(((int(value) + SIDE_MULTIPLE - 1) // SIDE_MULTIPLE) * SIDE_MULTIPLE, MIN_SIDE)
-    return min(snapped, MAX_SIDE)
-
-
-def resolution_for(aspect_ratio: str, megapixels: float = 1.0) -> tuple[int, int]:
-    """Width/height for an aspect ratio at a pixel budget, snapped for the model."""
-    if aspect_ratio not in ASPECT_RATIOS:
-        raise WorkflowError(
-            f"unknown aspect_ratio {aspect_ratio!r}; expected one of {sorted(ASPECT_RATIOS)}"
-        )
-    if megapixels <= 0:
-        raise WorkflowError("megapixels must be positive")
-    w_ratio, h_ratio = ASPECT_RATIOS[aspect_ratio]
-    scale = math.sqrt(megapixels * 1024 * 1024 / (w_ratio * h_ratio))
-    return snap_side(round(w_ratio * scale)), snap_side(round(h_ratio * scale))
-
-
-def random_seed() -> int:
-    return random.randrange(MAX_SEED + 1)
 
 
 @dataclass(frozen=True)
@@ -162,7 +137,7 @@ def resolve_params(
         prompt=prompt,
         width=snap_side(width),
         height=snap_side(height),
-        seed=random_seed() if seed is None else int(seed) % (MAX_SEED + 1),
+        seed=normalise_seed(seed),
         batch_size=int(batch_size),
         steps=resolved_steps,
         mu=float(mu if mu is not None else defaults["mu"]),

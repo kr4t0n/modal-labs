@@ -89,16 +89,18 @@ graphs on your GPU bill.
 
 ## Using it from your local ComfyUI
 
+The nodes for every service live in one package at the repository root:
+
 ```bash
-cp -r comfy_node /path/to/ComfyUI/custom_nodes/comfyui-ideogram4-modal
-cp comfy_node/.env.example /path/to/ComfyUI/custom_nodes/comfyui-ideogram4-modal/.env
+cp -r ../comfy_node /path/to/ComfyUI/custom_nodes/comfyui-modal-remote
+cp ../comfy_node/.env.example /path/to/ComfyUI/custom_nodes/comfyui-modal-remote/.env
 # edit that .env with your URL and Modal token, then restart ComfyUI
 ```
 
 The node needs no GPU and no extra dependencies, so a CPU-only ComfyUI works as
 a pure UI and orchestrator. For a clustered ComfyUI, wire the settings through a
 Secret instead of the `.env` file — see
-[`comfy_node/README.md`](comfy_node/README.md#install-on-a-kubernetes-comfyui).
+[`../comfy_node/README.md`](../comfy_node/README.md#install-on-a-kubernetes-comfyui).
 
 Two nodes appear under **Ideogram 4 (Modal)**:
 
@@ -209,7 +211,7 @@ clamped.
 
 Response: `{prompt_id, duration_s, params, images: [{filename, content_type, b64}]}`.
 `POST /generate/image` takes the same body and returns the first image as raw
-PNG bytes, with the seed in the `X-Ideogram4-Seed` header.
+PNG bytes, with the seed in the `X-Seed` header and the queue id in `X-Prompt-Id`.
 
 ## Configuration
 
@@ -271,15 +273,18 @@ Multiply the warm `duration_s` by the card's per-second price and compare.
 
 ```
 ideogram4/
-├── app.py                        Modal app: image, Volume, GPU class, endpoints
-├── server.py                     ASGI app: /generate + transparent ComfyUI proxy
-├── workflow.py                   The Ideogram 4 graph in ComfyUI API format
-├── client.py                     CLI: generate / template / health / validate
-├── comfy_node/                   Custom node for your local ComfyUI
-├── workflows/                    Ready-to-POST API-format graph
-├── assets/                       Magic-prompt template, example JSON caption
-└── tests/                        Graph structure + ASGI tests against a stub
+├── app.py         Modal object graph: weights, GPU class, endpoints
+├── server.py      Request model, resolver and the two extra routes
+├── workflow.py    The Ideogram 4 graph in ComfyUI API format
+├── client.py      CLI: generate / template / health / validate
+├── workflows/     Ready-to-POST API-format graph
+├── assets/        Magic-prompt template, example JSON caption
+└── tests/         Ideogram-4-specific assertions
 ```
+
+Everything generic lives outside this directory: `../comfyui_modal` (container
+image, ComfyUI supervisor, ASGI proxy, CLI plumbing) and `../comfy_node` (the
+ComfyUI nodes for every service).
 
 `AGENTS.md` covers the design decisions behind that layout.
 

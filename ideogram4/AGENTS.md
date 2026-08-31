@@ -23,13 +23,20 @@ so any ComfyUI client works against it unmodified.
 
 ## Components
 
+Only the model-specific parts live in this directory:
+
 | File | Responsibility |
 | --- | --- |
-| `app.py` | Modal wiring only: container image, weights Volume, GPU class, the two web endpoints, the `modal run` entrypoint. No request logic. |
-| `server.py` | The ASGI app. Typed `/generate` contract plus a transparent reverse proxy for everything else. Runs only inside the container. |
-| `workflow.py` | Pure function: parameters → ComfyUI API-format graph. No I/O, no Modal, no HTTP. This is what the tests exercise. |
-| `client.py` | Local CLI. Also holds `validate`, which is the schema-drift check. |
-| `comfy_node/` | Runs inside the *user's* ComfyUI, not this project's environment. Depends only on what ComfyUI already ships (torch, numpy, PIL, requests). |
+| `app.py` | The Modal object graph: weight table, Volume, GPU class, endpoints. No request logic. |
+| `server.py` | Ideogram 4's request model, its resolver, and the `/presets` and `/caption-template` routes. |
+| `workflow.py` | Pure function: parameters → ComfyUI API-format graph. No I/O, no Modal, no HTTP. |
+| `client.py` | Ideogram-specific CLI arguments; the transport comes from the shared package. |
+
+Everything generic is in `../comfyui_modal`: the container image and ComfyUI
+supervisor (`service.py`), the ASGI proxy and submit/poll/fetch loop
+(`server.py`), the resolution arithmetic (`geometry.py`), the CLI plumbing
+(`cli.py`) and the stub ComfyUI used by tests (`testing.py`). The ComfyUI nodes
+for every service live in `../comfy_node`.
 
 The split matters: `workflow.py` is the only place that knows the graph, so a
 ComfyUI upgrade that renames a node input is a one-file change, and

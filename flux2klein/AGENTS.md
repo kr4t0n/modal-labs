@@ -7,19 +7,20 @@ hand-written sampler) applies here unchanged and is not repeated.
 
 This file covers only what differs.
 
-## Duplication is known and deliberate — for now
+## Where the code lives
 
-`app.py`, `server.py`, `client.py` and `comfy_node/nodes.py` are close copies of
-the ideogram4 versions. That is a real maintenance hazard: the proxy header
-handling, the progress mirror and the `_single_line` build guard all exist
-because of bugs found once, and a fix applied to one copy will drift from the
-other.
+Only the model-specific parts are here: the weight table and Modal object graph
+(`app.py`), the request model and `/variants` route (`server.py`), the graph
+(`workflow.py`) and the CLI's own arguments (`client.py`).
 
-It was left duplicated so that adding this service could not destabilise a
-running production deployment. With two services the extraction is now worth
-doing: the model-specific surface is small — `workflow.py`, the weight table,
-and the request model's extra fields — and everything else is shared. Anyone
-adding a third service should extract first rather than copy again.
+The container image, ComfyUI supervisor, ASGI proxy, resolution arithmetic, CLI
+transport and test doubles are all in `../comfyui_modal`, shared with every other
+service. The ComfyUI nodes are in `../comfy_node`.
+
+An earlier revision copied those wholesale into each service. They were extracted
+once there were two consumers, because the proxy header handling, the progress
+mirror and the build-command guard all exist as fixes for bugs found the hard
+way, and N copies of them lose those fixes one at a time.
 
 ## What differs from ideogram4
 

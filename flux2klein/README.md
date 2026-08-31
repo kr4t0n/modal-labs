@@ -81,10 +81,10 @@ export MODAL_SECRET=ws-...
 ## Using it from ComfyUI
 
 ```bash
-cp -r comfy_node /path/to/ComfyUI/custom_nodes/comfyui-flux2klein-modal
+cp -r ../comfy_node /path/to/ComfyUI/custom_nodes/comfyui-modal-remote
 ```
 
-Fill in the endpoint and token (see [`comfy_node/README.md`](comfy_node/README.md),
+Fill in the endpoint and token (see [`../comfy_node/README.md`](../comfy_node/README.md),
 which also covers the Kubernetes Secret route), restart ComfyUI, and the
 **FLUX.2 klein (Modal)** node appears. It returns an ordinary `IMAGE` tensor and
 mirrors the remote sampler's progress onto its local progress bar.
@@ -175,14 +175,17 @@ The `distilled` variant is the far bigger lever: 4 steps against 20 is roughly a
 
 ```
 flux2klein/
-├── app.py                        Modal app: image, Volume, GPU class, endpoints
-├── server.py                     ASGI app: /generate + transparent ComfyUI proxy
-├── workflow.py                   The FLUX.2 klein graph in ComfyUI API format
-├── client.py                     CLI: generate / variants / health / validate
-├── comfy_node/                   Custom node for your ComfyUI
-├── workflows/                    Ready-to-POST API-format graph
-└── tests/                        Graph structure + ASGI tests against a stub
+├── app.py         Modal object graph: weights, GPU class, endpoints
+├── server.py      Request model, resolver and the /variants route
+├── workflow.py    The FLUX.2 klein graph in ComfyUI API format
+├── client.py      CLI: generate / variants / health / validate
+├── workflows/     Ready-to-POST API-format graph
+└── tests/         FLUX.2-klein-specific assertions
 ```
+
+Everything generic lives outside this directory: `../comfyui_modal` (container
+image, ComfyUI supervisor, ASGI proxy, CLI plumbing) and `../comfy_node` (the
+ComfyUI nodes for every service).
 
 ## Testing
 
