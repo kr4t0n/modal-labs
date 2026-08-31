@@ -20,10 +20,8 @@ Deploy-time configuration comes from the environment; see .env.example.
 from __future__ import annotations
 
 import os
-import shutil
 import sys
 from pathlib import Path
-from typing import NamedTuple
 
 import modal
 
@@ -34,7 +32,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 
-from comfyui_modal import service  # noqa: E402
+from comfyui_modal import service, weights  # noqa: E402
 from comfyui_modal.service import (  # noqa: E402
     COMFY_HOST,
     COMFY_PORT,
@@ -51,39 +49,32 @@ APP_NAME = "flux2klein-comfyui"
 HF_SECRET_NAME = os.environ.get("FLUX2KLEIN_HF_SECRET", "huggingface-secret")
 
 
-class ModelFile(NamedTuple):
-    repo_id: str
-    filename: str
-    destination: str
-    gated: bool
-
-
 MODEL_FILES = (
-    ModelFile(
+    weights.HuggingFaceFile(
         "black-forest-labs/FLUX.2-klein-base-9b-fp8",
         "flux-2-klein-base-9b-fp8.safetensors",
         "diffusion_models/flux-2-klein-base-9b-fp8.safetensors",
         gated=True,
     ),
-    ModelFile(
+    weights.HuggingFaceFile(
         "black-forest-labs/FLUX.2-klein-9b-fp8",
         "flux-2-klein-9b-fp8.safetensors",
         "diffusion_models/flux-2-klein-9b-fp8.safetensors",
         gated=True,
     ),
-    ModelFile(
+    weights.HuggingFaceFile(
         "Comfy-Org/flux2-klein-9B",
         "split_files/text_encoders/qwen_3_8b_fp8mixed.safetensors",
         "text_encoders/qwen_3_8b_fp8mixed.safetensors",
         gated=False,
     ),
-    ModelFile(
+    weights.HuggingFaceFile(
         "ponpoke/flux2-klein-9b-uncensored-text-encoder",
         "model.safetensors",
         "text_encoders/qwen_3_8b_uncensored_bf16.safetensors",
         gated=True,
     ),
-    ModelFile(
+    weights.HuggingFaceFile(
         "black-forest-labs/FLUX.2-small-decoder",
         "full_encoder_small_decoder.safetensors",
         "vae/full_encoder_small_decoder.safetensors",
@@ -91,7 +82,7 @@ MODEL_FILES = (
     ),
     # Adapters. Small enough that fetching them unconditionally costs little,
     # and a request naming one must not have to wait for a download.
-    ModelFile(
+    weights.HuggingFaceFile(
         "Ashen3/SNOFS",
         "Klein9b/klein_snofs_v1_4.safetensors",
         "loras/klein_snofs_v1_4.safetensors",
@@ -99,11 +90,7 @@ MODEL_FILES = (
     ),
 )
 
-# Downloads land here first and are then renamed into place. Same Volume, so the
-# move is a rename rather than a second copy of 9 GB.
-STAGING_DIR = f"{MODELS_DIR}/.staging"
-
-REQUIRED_MODELS = tuple(model.destination for model in MODEL_FILES)
+REQUIRED_MODELS = weights.destinations(MODEL_FILES)
 
 EXTRA_MODEL_PATHS_YAML = service.extra_model_paths_yaml(
     "flux2klein", ("diffusion_models", "text_encoders", "vae", "loras")
@@ -129,38 +116,10 @@ app = modal.App(APP_NAME, image=image)
 def download_models(force: bool = False) -> list[str]:
     """Populate the weights Volume.
 
-    Idempotent by destination: an existing file is left alone unless `force`.
-    The two transformers are gated, so the Hugging Face account behind HF_TOKEN
-    must have accepted the FLUX.2 licence first, or the download 401s.
+    The two transformers and the uncensored encoder are gated, so the Hugging
+    Face account behind HF_TOKEN must have accepted each licence first.
     """
-    from huggingface_hub import hf_hub_download
-    from huggingface_hub.errors import GatedRepoError
-
-    written = []
-    for model in MODEL_FILES:
-        target = Path(MODELS_DIR, model.destination)
-        if target.is_file() and not force:
-            print(f"have {model.destination}, skipping")
-            written.append(str(target))
-            continue
-
-        print(f"fetching {model.repo_id}/{model.filename} ...")
-        try:
-            staged = hf_hub_download(
-                repo_id=model.repo_id, filename=model.filename, local_dir=STAGING_DIR
-            )
-        except GatedRepoError as exc:
-            raise RuntimeError(
-                f"{model.repo_id} is gated. Accept the licence at "
-                f"https://huggingface.co/{model.repo_id} using the account that owns "
-                "HF_TOKEN, then re-run."
-            ) from exc
-
-        target.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(staged, target)
-        written.append(str(target))
-
-    shutil.rmtree(STAGING_DIR, ignore_errors=True)
+    written = weights.download_weights(MODEL_FILES, MODELS_DIR, force=force)
     models_volume.commit()
     return written
 

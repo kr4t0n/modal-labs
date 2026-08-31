@@ -17,11 +17,8 @@ Deploy-time configuration comes from the environment; see .env.example.
 
 from __future__ import annotations
 
-import os
-import shutil
 import sys
 from pathlib import Path
-from typing import NamedTuple
 
 import modal
 
@@ -32,7 +29,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 
-from comfyui_modal import service  # noqa: E402
+from comfyui_modal import service, weights  # noqa: E402
 from comfyui_modal.service import (  # noqa: E402
     COMFY_HOST,
     COMFY_PORT,
@@ -44,33 +41,15 @@ from comfyui_modal.service import (  # noqa: E402
 APP_NAME = "waiillustrious-comfyui"
 
 
-class CivitaiFile(NamedTuple):
-    """One Civitai download, pinned by version and verified by digest."""
-
-    model_version_id: int
-    file_id: int
-    destination: str
-    sha256: str
-
-    @property
-    def url(self) -> str:
-        # Civitai answers this with a 24-hour presigned CDN link, so the
-        # redirect has to be followed at download time rather than pinned here.
-        return (
-            f"https://civitai.com/api/download/models/{self.model_version_id}?fileId={self.file_id}"
-        )
-
-
-CHECKPOINT_FILE = CivitaiFile(
+CHECKPOINT_FILE = weights.CivitaiFile(
     model_version_id=2883731,  # v17.0
     file_id=2763986,
     destination="checkpoints/waiIllustriousSDXL_v170.safetensors",
     sha256="f116b0c78ff441467b0cdc8f1936e1ed18ea31e9997c7b132b1b8db533f0bd04",
 )
 
-REQUIRED_MODELS = (CHECKPOINT_FILE.destination,)
-
-STAGING_DIR = f"{MODELS_DIR}/.staging"
+MODEL_FILES = (CHECKPOINT_FILE,)
+REQUIRED_MODELS = weights.destinations(MODEL_FILES)
 
 EXTRA_MODEL_PATHS_YAML = service.extra_model_paths_yaml("waiillustrious", ("checkpoints",))
 
@@ -88,60 +67,10 @@ app = modal.App(APP_NAME, image=image)
 
 @app.function(volumes={MODELS_DIR: models_volume}, timeout=3600)
 def download_models(force: bool = False) -> list[str]:
-    """Fetch the checkpoint from Civitai, verifying its published digest.
-
-    Idempotent by destination: an existing file is left alone unless `force`.
-    A CIVITAI_TOKEN in the environment is used if present — the download is
-    currently anonymous, so none is attached, but adding a Modal Secret with
-    that key is all it would take should Civitai start requiring one.
-    """
-    import hashlib
-
-    import httpx
-
-    target = Path(MODELS_DIR, CHECKPOINT_FILE.destination)
-    if target.is_file() and not force:
-        print(f"have {CHECKPOINT_FILE.destination}, skipping")
-        return [str(target)]
-
-    target.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(STAGING_DIR)
-    staging.mkdir(parents=True, exist_ok=True)
-    staged = staging / "checkpoint.safetensors"
-
-    headers = {}
-    if token := os.environ.get("CIVITAI_TOKEN"):
-        headers["Authorization"] = f"Bearer {token}"
-
-    digest = hashlib.sha256()
-    print(f"fetching {CHECKPOINT_FILE.url} ...")
-    with httpx.stream(
-        "GET",
-        CHECKPOINT_FILE.url,
-        follow_redirects=True,
-        headers=headers,
-        timeout=httpx.Timeout(connect=30.0, read=None, write=None, pool=None),
-    ) as response:
-        response.raise_for_status()
-        with staged.open("wb") as handle:
-            for chunk in response.iter_bytes(4 << 20):
-                handle.write(chunk)
-                digest.update(chunk)
-
-    actual = digest.hexdigest()
-    if actual != CHECKPOINT_FILE.sha256:
-        staged.unlink(missing_ok=True)
-        raise RuntimeError(
-            "checksum mismatch from Civitai: expected "
-            f"{CHECKPOINT_FILE.sha256}, got {actual}. Refusing to install."
-        )
-
-    # Same Volume, so this is a rename rather than a second copy of 6.8 GB.
-    os.replace(staged, target)
-    shutil.rmtree(STAGING_DIR, ignore_errors=True)
+    """Fetch the checkpoint from Civitai, verifying its published digest."""
+    written = weights.download_weights(MODEL_FILES, MODELS_DIR, force=force)
     models_volume.commit()
-    print(f"installed {CHECKPOINT_FILE.destination} (sha256 verified)")
-    return [str(target)]
+    return written
 
 
 @app.cls(

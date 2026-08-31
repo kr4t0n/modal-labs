@@ -55,6 +55,12 @@ means re-deploying.
 function populates the Volume; serving containers mount it read-only. This keeps
 image builds fast and makes weight updates independent of code deploys.
 
+Fetching itself lives in `comfyui_modal/weights.py`, which knows two sources:
+Hugging Face (repo + path, optionally gated) and Civitai (version id, presigned
+redirect, **published SHA256 verified before install**). Anything without an
+upstream integrity guarantee must carry a digest — a substituted file then fails
+closed regardless of which host served it. Do not add a third fetcher inline.
+
 **Endpoints are authenticated by default.** New web endpoints get
 `requires_proxy_auth=True` unless there is a stated reason otherwise (browser
 UIs cannot send the headers — those are meant for `modal serve`, not `deploy`).
