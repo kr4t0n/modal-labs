@@ -28,6 +28,10 @@ jobs:
       - name: Test
         run: uv run pytest -q
 
-      - name: Check the Modal app builds its object graph
+      - name: Check each Modal app builds its object graph
         # Catches decorator/signature mistakes without needing Modal credentials.
-        run: uv run python -c "import sys; sys.path.insert(0, 'ideogram4'); import app; print(app.app.name)"
+        # Separate processes: both services define a module named `app`.
+        run: |
+          for project in ideogram4 flux2klein; do
+            uv run python -c "import sys; sys.path.insert(0, '$project'); import app; print('$project ->', app.app.name)"
+          done

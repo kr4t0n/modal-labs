@@ -58,5 +58,16 @@ testable surface is the pure logic — model graphs, parameter resolution, reque
 mapping — while anything requiring the real service is a CLI subcommand a human
 runs against a live deployment (see `ideogram4/client.py validate`).
 
-CI additionally imports each `app.py`, which catches decorator and signature
-mistakes without deploying anything.
+CI additionally imports each `app.py` — in a separate process per project,
+because every service defines modules named `app`, `server` and `workflow`.
+Within pytest the same collision is handled by each test module clearing those
+names from `sys.modules` before importing, plus a guard test asserting it bound
+its own project's copy. Without it a suite silently tests the wrong project.
+
+## Adding a service
+
+Services are currently near-copies of each other: only `workflow.py`, the weight
+table and a few request fields are model-specific. That was acceptable at two.
+Before adding a third, extract the shared Modal wiring, ASGI layer and node
+runtime into one place — the proxy, progress mirror and build guards all encode
+bugs found the hard way, and maintaining N copies of them will lose those fixes.

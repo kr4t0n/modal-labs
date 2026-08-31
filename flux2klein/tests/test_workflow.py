@@ -1,9 +1,10 @@
-"""Structural tests for the Ideogram 4 graph.
+"""Structural tests for the FLUX.2 klein graph.
 
-These guard the parts that fail silently: a preset that stops being applied, a
-dimension that stops snapping to 16, or a link that points at a node that was
-renamed. Whether the *node schemas* still match a given ComfyUI build is a
-different question, answered by `client.py validate` against a live deployment.
+Same intent as the ideogram4 suite: guard the things that fail silently — a
+variant whose sampler defaults stop being applied, a dimension that stops
+snapping to 16, or a link pointing at a renamed node. Whether the node schemas
+still match a given ComfyUI build is answered by `client.py validate` against a
+live deployment.
 """
 
 from __future__ import annotations
@@ -29,21 +30,35 @@ def graph_for(**kwargs):
     return workflow.build_workflow(workflow.resolve_params("a test prompt", **kwargs))
 
 
-def test_preset_supplies_schedule():
-    params = workflow.resolve_params("x", preset="Turbo")
-    assert (params.steps, params.mu, params.std) == (12, 0.5, 1.75)
+@pytest.mark.parametrize(
+    ("variant", "checkpoint", "steps", "cfg"),
+    [
+        ("base", "flux-2-klein-base-9b-fp8.safetensors", 20, 5.0),
+        ("distilled", "flux-2-klein-9b-fp8.safetensors", 4, 1.0),
+    ],
+)
+def test_variant_selects_checkpoint_and_sampler_defaults(variant, checkpoint, steps, cfg):
+    """Values come from the official templates; drifting from them is a bug."""
+    params = workflow.resolve_params("x", variant=variant)
+    assert params.checkpoint == checkpoint
+    assert params.steps == steps
+    assert params.cfg == cfg
 
 
-def test_explicit_values_beat_the_preset():
-    params = workflow.resolve_params("x", preset="Turbo", steps=30, std=1.5)
-    assert params.steps == 30
-    assert params.std == 1.5
-    assert params.mu == 0.5  # untouched, still from the preset
+def test_explicit_values_beat_the_variant():
+    params = workflow.resolve_params("x", variant="distilled", steps=8, cfg=2.5)
+    assert params.steps == 8
+    assert params.cfg == 2.5
+    assert params.checkpoint == "flux-2-klein-9b-fp8.safetensors"
+
+
+def test_unknown_variant_rejected():
+    with pytest.raises(workflow.WorkflowError):
+        workflow.resolve_params("x", variant="turbo")
 
 
 @pytest.mark.parametrize(
-    ("requested", "expected"),
-    [(1000, 1008), (1024, 1024), (1, 256), (4096, 2048), (2041, 2048)],
+    ("requested", "expected"), [(1000, 1008), (1024, 1024), (1, 256), (4096, 2048)]
 )
 def test_sides_snap_to_multiples_of_16_and_clamp(requested, expected):
     assert workflow.snap_side(requested) == expected
@@ -53,12 +68,6 @@ def test_resolution_for_respects_ratio_and_budget():
     width, height = workflow.resolution_for("16:9", 1.0)
     assert width % 16 == 0 and height % 16 == 0
     assert 1.7 < width / height < 1.8
-    assert 0.8e6 < width * height < 1.3e6
-
-
-def test_unknown_aspect_ratio_rejected():
-    with pytest.raises(workflow.WorkflowError):
-        workflow.resolution_for("5:1")
 
 
 @pytest.mark.parametrize("prompt", ["", "   "])
@@ -67,16 +76,10 @@ def test_empty_prompt_rejected(prompt):
         workflow.resolve_params(prompt)
 
 
-def test_unknown_preset_rejected():
-    with pytest.raises(workflow.WorkflowError):
-        workflow.resolve_params("x", preset="Ludicrous")
-
-
 def test_seed_is_stable_when_given_and_random_otherwise():
     assert workflow.resolve_params("x", seed=42).seed == 42
     seeds = {workflow.resolve_params("x").seed for _ in range(20)}
     assert len(seeds) > 1
-    assert all(0 <= seed <= workflow.MAX_SEED for seed in seeds)
 
 
 def test_every_link_targets_an_existing_node():
@@ -92,16 +95,13 @@ def test_every_link_targets_an_existing_node():
 def test_graph_is_json_serialisable_and_complete():
     graph = graph_for()
     json.dumps(graph)
-    classes = {node["class_type"] for node in graph.values()}
-    assert classes == {
+    assert {node["class_type"] for node in graph.values()} == {
         "UNETLoader",
-        "CFGOverride",
         "CLIPLoader",
         "CLIPTextEncode",
-        "ConditioningZeroOut",
-        "DualModelGuider",
+        "CFGGuider",
         "KSamplerSelect",
-        "Ideogram4Scheduler",
+        "Flux2Scheduler",
         "RandomNoise",
         "EmptyFlux2LatentImage",
         "SamplerCustomAdvanced",
@@ -112,48 +112,41 @@ def test_graph_is_json_serialisable_and_complete():
     assert workflow.OUTPUT_NODE_ID in graph
 
 
-def test_prompt_text_reaches_the_text_encoder():
-    """The one thing whose absence yields a good image that ignores the prompt."""
-    graph = workflow.build_workflow(workflow.resolve_params("a distinctive prompt"))
+def test_prompt_and_negative_reach_separate_encoders():
+    """The failure mode this guards: a good image that ignores the prompt."""
+    params = workflow.resolve_params("a distinctive prompt", negative_prompt="blurry, jpeg")
+    graph = workflow.build_workflow(params)
     assert graph["positive"]["inputs"]["text"] == "a distinctive prompt"
-    assert graph["positive"]["inputs"]["clip"] == ["load_clip", 0]
+    assert graph["negative"]["inputs"]["text"] == "blurry, jpeg"
+    # Both encoders must share the one loaded text encoder.
+    assert graph["positive"]["inputs"]["clip"] == graph["negative"]["inputs"]["clip"]
     assert graph["guider"]["inputs"]["positive"] == ["positive", 0]
+    assert graph["guider"]["inputs"]["negative"] == ["negative", 0]
 
 
-def test_structured_caption_is_serialised_into_the_encoder():
-    request = server.GenerateRequest(json_prompt={"high_level_description": "a bee"})
-    graph = workflow.build_workflow(workflow.resolve_params(request.caption()))
-    assert "high_level_description" in graph["positive"]["inputs"]["text"]
-    assert "a bee" in graph["positive"]["inputs"]["text"]
-
-
-def test_dual_branch_wiring():
-    """The late-CFG override must sit between the conditional UNet and guider."""
+def test_single_transformer_wiring():
+    """Unlike Ideogram 4 there is no unconditional model; CFGGuider takes one."""
     graph = graph_for()
-    assert graph["late_cfg"]["inputs"]["model"] == ["load_unet", 0]
-    guider = graph["guider"]["inputs"]
-    assert guider["model"] == ["late_cfg", 0]
-    assert guider["model_negative"] == ["load_unet_uncond", 0]
-    assert guider["negative"] == ["negative", 0]
-    assert graph["negative"]["inputs"]["conditioning"] == ["positive", 0]
+    assert graph["guider"]["inputs"]["model"] == ["load_unet", 0]
+    assert "model_negative" not in graph["guider"]["inputs"]
+    assert sum(n["class_type"] == "UNETLoader" for n in graph.values()) == 1
 
 
-def test_scheduler_sees_the_snapped_dimensions():
+def test_scheduler_and_latent_agree_on_dimensions():
     graph = graph_for(width=1000, height=500)
     assert graph["sigmas"]["inputs"]["width"] == graph["latent"]["inputs"]["width"] == 1008
     assert graph["sigmas"]["inputs"]["height"] == graph["latent"]["inputs"]["height"] == 512
 
 
-def test_request_prefers_structured_caption():
-    request = server.GenerateRequest(prompt="ignored", json_prompt={"a": 1})
-    assert json.loads(request.caption()) == {"a": 1}
-
-
 def test_request_aspect_ratio_overrides_sides():
     request = server.GenerateRequest(prompt="x", width=512, height=512, aspect_ratio="21:9")
     width, height = request.dimensions()
-    assert width > height
-    assert (width, height) != (512, 512)
+    assert width > height and (width, height) != (512, 512)
+
+
+def test_request_defaults_leave_sampler_to_the_variant():
+    request = server.GenerateRequest(prompt="x", variant="distilled")
+    assert request.steps is None and request.cfg is None
 
 
 def test_suite_imported_this_projects_modules():

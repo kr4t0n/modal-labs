@@ -1,0 +1,176 @@
+{
+  "load_unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux-2-klein-base-9b-fp8.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "FLUX.2 klein 9B (base)"
+    }
+  },
+  "load_clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "Qwen3 8B text encoder"
+    }
+  },
+  "positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "load_clip",
+        0
+      ],
+      "text": "a vintage motorcycle parked in front of a retro diner at sunset"
+    },
+    "_meta": {
+      "title": "Prompt"
+    }
+  },
+  "negative": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "load_clip",
+        0
+      ],
+      "text": ""
+    },
+    "_meta": {
+      "title": "Negative prompt"
+    }
+  },
+  "guider": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": [
+        "load_unet",
+        0
+      ],
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "cfg": 5.0
+    },
+    "_meta": {
+      "title": "CFG"
+    }
+  },
+  "sampler": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "_meta": {
+      "title": "Sampler"
+    }
+  },
+  "sigmas": {
+    "class_type": "Flux2Scheduler",
+    "inputs": {
+      "steps": 20,
+      "width": 1024,
+      "height": 1024
+    },
+    "_meta": {
+      "title": "FLUX.2 schedule"
+    }
+  },
+  "noise": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 0
+    },
+    "_meta": {
+      "title": "Noise"
+    }
+  },
+  "latent": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "Empty latent"
+    }
+  },
+  "sample": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "noise",
+        0
+      ],
+      "guider": [
+        "guider",
+        0
+      ],
+      "sampler": [
+        "sampler",
+        0
+      ],
+      "sigmas": [
+        "sigmas",
+        0
+      ],
+      "latent_image": [
+        "latent",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Sample"
+    }
+  },
+  "load_vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "full_encoder_small_decoder.safetensors"
+    },
+    "_meta": {
+      "title": "VAE"
+    }
+  },
+  "decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "sample",
+        0
+      ],
+      "vae": [
+        "load_vae",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Decode"
+    }
+  },
+  "save_image": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "decode",
+        0
+      ],
+      "filename_prefix": "flux2-klein"
+    },
+    "_meta": {
+      "title": "Save"
+    }
+  }
+}

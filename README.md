@@ -9,7 +9,12 @@ environment and tooling.
 
 | Project | What it does |
 | --- | --- |
-| [`ideogram4/`](ideogram4/) | Ideogram 4 text-to-image on an H100, served as a ComfyUI API so a local ComfyUI can use it as a remote model endpoint |
+| [`ideogram4/`](ideogram4/) | Ideogram 4 text-to-image, served as a ComfyUI API so a local ComfyUI can use it as a remote model endpoint |
+| [`flux2klein/`](flux2klein/) | FLUX.2 [klein] 9B text-to-image, same pattern — natural-language prompts, base and 4-step distilled variants |
+
+Both expose one URL that is simultaneously a real ComfyUI server and a typed
+`/generate` contract, and both ship a custom node so a CPU-only ComfyUI can stay
+the UI while the GPU work happens on Modal.
 
 ## Setup
 

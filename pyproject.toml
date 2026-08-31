@@ -40,7 +40,10 @@ ignore = [
 known-first-party = ["workflow", "server", "app"]
 
 [tool.pytest.ini_options]
-testpaths = ["ideogram4/tests"]
+testpaths = ["ideogram4/tests", "flux2klein/tests"]
+# Both services have a tests/test_workflow.py. importlib mode names modules by
+# full path, so identical basenames across projects no longer collide.
+addopts = "--import-mode=importlib"
 asyncio_mode = "auto"
 # Concurrency tests must fail loudly rather than hang CI.
 timeout = 60

@@ -33,8 +33,8 @@ def test_build_commands_are_single_line():
 
 def test_extra_model_paths_is_valid_yaml_for_the_volume():
     config = yaml.safe_load(app.EXTRA_MODEL_PATHS_YAML)
-    assert set(config) == {"ideogram4"}
-    section = config["ideogram4"]
+    assert set(config) == {"flux2klein"}
+    section = config["flux2klein"]
     assert section["base_path"] == app.MODELS_DIR
     # These keys are ComfyUI's own folder names. A typo yields an empty model
     # list and an error only once a prompt is queued.
@@ -44,16 +44,25 @@ def test_extra_model_paths_is_valid_yaml_for_the_volume():
 
 
 def test_downloaded_layout_matches_what_the_graph_asks_for():
-    """hf_hub_download preserves repo subpaths, so the two must line up."""
-    downloaded = set(app.MODEL_FILES)
-    assert f"diffusion_models/{workflow.DIFFUSION_MODEL}" in downloaded
-    assert f"diffusion_models/{workflow.UNCONDITIONAL_DIFFUSION_MODEL}" in downloaded
-    assert f"text_encoders/{workflow.TEXT_ENCODER}" in downloaded
-    assert f"vae/{workflow.VAE}" in downloaded
+    """Each file is renamed to an explicit destination; they must line up."""
+    destinations = {m.destination for m in app.MODEL_FILES}
+    for variant in workflow.VARIANTS.values():
+        assert f"diffusion_models/{variant.checkpoint}" in destinations
+    assert f"text_encoders/{workflow.TEXT_ENCODER}" in destinations
+    assert f"vae/{workflow.VAE}" in destinations
 
 
 def test_every_downloaded_file_sits_under_a_configured_search_path():
-    section = yaml.safe_load(app.EXTRA_MODEL_PATHS_YAML)["ideogram4"]
+    section = yaml.safe_load(app.EXTRA_MODEL_PATHS_YAML)["flux2klein"]
     configured = {value for key, value in section.items() if key != "base_path"}
-    for filename in app.MODEL_FILES:
-        assert filename.split("/")[0] in configured, filename
+    for model in app.MODEL_FILES:
+        assert model.destination.split("/")[0] in configured, model.destination
+
+
+def test_gated_repos_are_flagged():
+    """The two transformers need an HF token; mislabelling them hides the 401."""
+    gated = {m.repo_id for m in app.MODEL_FILES if m.gated}
+    assert gated == {
+        "black-forest-labs/FLUX.2-klein-base-9b-fp8",
+        "black-forest-labs/FLUX.2-klein-9b-fp8",
+    }
