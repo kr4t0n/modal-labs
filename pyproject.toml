@@ -40,7 +40,13 @@ ignore = [
 known-first-party = ["workflow", "server", "app"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "ideogram4/tests", "flux2klein/tests", "waiillustrious/tests"]
+testpaths = [
+    "tests",
+    "ideogram4/tests",
+    "flux2klein/tests",
+    "waiillustrious/tests",
+    "ultra/tests",
+]
 # Both services have a tests/test_workflow.py. importlib mode names modules by
 # full path, so identical basenames across projects no longer collide.
 addopts = "--import-mode=importlib"

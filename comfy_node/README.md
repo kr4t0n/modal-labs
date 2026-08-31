@@ -11,6 +11,7 @@ management — it runs unchanged on a CPU-only install.
 | **Ideogram 4 Caption Template (Modal)** | Ideogram 4 (Modal) |
 | **FLUX.2 klein (Modal)** | FLUX.2 klein (Modal) |
 | **WAI-illustrious (Modal)** | WAI-illustrious (Modal) |
+| **ULTRA / Krea 2 (Modal)** | ULTRA / Krea 2 (Modal) |
 
 Nodes whose endpoint is unconfigured simply raise a clear error when run, so
 installing the package without deploying every service is fine.
@@ -91,6 +92,12 @@ SDXL sampler controls — `steps`, `cfg`, `sampler_name`, `scheduler` and
 against the penultimate CLIP layer, and `-1` quietly degrades prompt adherence
 rather than erroring. The negative prompt is pre-filled with the standard
 Danbooru negative; clear it if you do not want it.
+
+**ULTRA / Krea 2 (Modal)** → `IMAGE`, `INT` (seed), `STRING` (info)
+
+Natural-language prompts. Defaults to Krea 2 turbo's 8 steps at cfg 1, where the
+negative prompt has no effect — the node says so in its `info` output if you fill
+one in anyway. Raise `cfg` to make it active.
 
 For all render nodes, set `aspect_ratio` to `custom` to use the width/height
 widgets, and use the optional `endpoint` widget to override the environment if
