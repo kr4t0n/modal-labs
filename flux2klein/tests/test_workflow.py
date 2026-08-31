@@ -35,6 +35,7 @@ def graph_for(**kwargs):
     [
         ("base", "flux-2-klein-base-9b-fp8.safetensors", 20, 5.0),
         ("distilled", "flux-2-klein-9b-fp8.safetensors", 4, 1.0),
+        ("base-uncensored", "flux-2-klein-base-9b-fp8.safetensors", 20, 5.0),
     ],
 )
 def test_variant_selects_checkpoint_and_sampler_defaults(variant, checkpoint, steps, cfg):
@@ -43,6 +44,21 @@ def test_variant_selects_checkpoint_and_sampler_defaults(variant, checkpoint, st
     assert params.checkpoint == checkpoint
     assert params.steps == steps
     assert params.cfg == cfg
+
+
+def test_only_the_uncensored_variant_swaps_the_text_encoder():
+    """The encoder is per-variant; a leak either way changes what renders."""
+    graphs = {
+        name: workflow.build_workflow(workflow.resolve_params("x", variant=name))
+        for name in workflow.VARIANTS
+    }
+    encoders = {n: g["load_clip"]["inputs"]["clip_name"] for n, g in graphs.items()}
+    assert encoders["base"] == encoders["distilled"] == workflow.TEXT_ENCODER
+    assert encoders["base-uncensored"] == workflow.UNCENSORED_TEXT_ENCODER
+
+    # Same transformer and schedule as base: the encoder is the only difference.
+    assert graphs["base-uncensored"]["load_unet"]["inputs"] == graphs["base"]["load_unet"]["inputs"]
+    assert graphs["base-uncensored"]["sigmas"]["inputs"] == graphs["base"]["sigmas"]["inputs"]
 
 
 def test_explicit_values_beat_the_variant():

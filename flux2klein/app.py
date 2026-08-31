@@ -9,8 +9,8 @@ Only the model-specific parts live here — the weight table, the graph, the Mod
 object graph. The container image, the ComfyUI supervisor and the ASGI layer come
 from `comfyui_modal`.
 
-    modal secret create huggingface HF_TOKEN=hf_...   # the transformers are gated
-    modal run app.py::download_models                 # one-off, ~28 GB
+    modal secret create huggingface-secret HF_TOKEN=hf_...   # transformers are gated
+    modal run app.py::download_models                 # one-off, ~44 GB
     modal deploy app.py                               # the API
     modal serve app.py                                # the browser UI, ephemeral
 
@@ -48,7 +48,7 @@ APP_NAME = "flux2klein-comfyui"
 # --- Weights ----------------------------------------------------------------
 # Unlike the ideogram4 service these come from four repos whose internal layouts
 # do not match ComfyUI's, so every file carries an explicit destination.
-HF_SECRET_NAME = os.environ.get("FLUX2KLEIN_HF_SECRET", "huggingface")
+HF_SECRET_NAME = os.environ.get("FLUX2KLEIN_HF_SECRET", "huggingface-secret")
 
 
 class ModelFile(NamedTuple):
@@ -78,6 +78,12 @@ MODEL_FILES = (
         gated=False,
     ),
     ModelFile(
+        "ponpoke/flux2-klein-9b-uncensored-text-encoder",
+        "model.safetensors",
+        "text_encoders/qwen_3_8b_uncensored_bf16.safetensors",
+        gated=True,
+    ),
+    ModelFile(
         "black-forest-labs/FLUX.2-small-decoder",
         "full_encoder_small_decoder.safetensors",
         "vae/full_encoder_small_decoder.safetensors",
@@ -95,9 +101,9 @@ EXTRA_MODEL_PATHS_YAML = service.extra_model_paths_yaml(
     "flux2klein", ("diffusion_models", "text_encoders", "vae")
 )
 
-# Only one transformer is resident at a time here, so the working set is ~18.5 GB
-# — materially smaller than the ideogram4 service, and a better candidate for a
-# cheaper GPU. Compare cost per image, not per hour. See README, "Choosing a GPU".
+# One transformer and one encoder are resident at a time: ~18 GB for base and
+# distilled, ~26 GB for base-uncensored (bf16 encoder). Still smaller than the
+# ideogram4 service. Compare cost per image, not per hour — see README.
 SETTINGS = service.Settings.from_env("FLUX2KLEIN", gpu="H100")
 
 models_volume = modal.Volume.from_name("flux2klein-models", create_if_missing=True)

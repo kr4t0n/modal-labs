@@ -15,13 +15,28 @@ Two checkpoints ship, and the choice matters:
 | --- | --- | --- | --- |
 | `base` | 20 | 5.0 | Default. Undistilled, responds to CFG and negative prompts. |
 | `distilled` | 4 | 1.0 | ~5x fewer steps. Guidance-distilled, so it ignores CFG and negative prompts. |
+| `base-uncensored` | 20 | 5.0 | As `base`, with an abliterated text encoder — see below. |
+
+The variant selects the transformer *and* its text encoder, because the two are
+validated together. `base-uncensored` differs from `base` in the encoder alone:
+same transformer, same schedule, so any difference in output comes from prompt
+handling.
 
 Unlike Ideogram 4 this takes ordinary natural-language prompts — no structured
 caption required — and supports a real negative prompt.
 
-> **Licence.** Both transformers are under the **FLUX.2 non-commercial licence**
-> and are **gated** on Hugging Face. You must accept the agreement with the
-> account whose token you use. This repository ships no weights.
+> **Licence.** The transformers and both text encoders are under **FLUX.2
+> non-commercial licences** and are **gated** on Hugging Face. You must accept
+> each agreement with the account whose token you use. This repository ships no
+> weights.
+
+> **`base-uncensored`.** Its encoder is
+> [`ponpoke/flux2-klein-9b-uncensored-text-encoder`](https://huggingface.co/ponpoke/flux2-klein-9b-uncensored-text-encoder),
+> an *abliterated* Qwen3-8B: the refusal direction is orthogonalised out of the
+> encoder's mid and late layers, so prompt-stage safety filtering no longer
+> applies. Its gate carries its own terms of use, and what the deployment
+> produces becomes entirely your responsibility. Skip this variant and its
+> ~16 GB download if you do not want it — the other two are unaffected.
 
 ## What you get
 
@@ -51,13 +66,13 @@ owns your token:
 **2. Give Modal the token** ([create one](https://huggingface.co/settings/tokens)):
 
 ```bash
-uv run modal secret create huggingface HF_TOKEN=hf_...
+uv run modal secret create huggingface-secret HF_TOKEN=hf_...
 ```
 
 **3. Pull the weights and deploy:**
 
 ```bash
-uv run modal run app.py::download_models   # ~28 GB into a Volume. One-off.
+uv run modal run app.py::download_models   # ~44 GB into a Volume. One-off.
 uv run modal deploy app.py
 ```
 
@@ -139,7 +154,7 @@ All read at deploy time; see [`.env.example`](.env.example).
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `FLUX2KLEIN_HF_SECRET` | `huggingface` | Modal Secret holding `HF_TOKEN` |
+| `FLUX2KLEIN_HF_SECRET` | `huggingface-secret` | Modal Secret holding `HF_TOKEN` |
 | `FLUX2KLEIN_GPU` | `H100` | Any Modal GPU string |
 | `FLUX2KLEIN_MIN_CONTAINERS` | `0` | Warm containers |
 | `FLUX2KLEIN_MAX_CONTAINERS` | `1` | Keep at 1 unless clients submit and poll in one request |
@@ -150,9 +165,10 @@ All read at deploy time; see [`.env.example`](.env.example).
 
 ### Choosing a GPU
 
-~28 GB of weights sit on disk, but only one transformer loads at a time, so the
-working set is about **18.5 GB** — materially lighter than the ideogram4 service
-and a better candidate for a cheaper card.
+~44 GB of weights sit on disk, but only one transformer and one encoder load at
+a time. The working set is about **18 GB** for `base` and `distilled`, and about
+**26 GB** for `base-uncensored`, whose encoder is bf16 rather than fp8mixed.
+Both are lighter than the ideogram4 service.
 
 The fp8 checkpoints want fp8 tensor cores, meaning compute capability 8.9+
 (Ada, Hopper, Blackwell). `L40S` (48 GB, roughly half H100's hourly rate) has
@@ -208,5 +224,5 @@ driving it with a CFG above 1. Turn `override_sampler` off, or set `cfg` to 1.
 `base`.
 
 **First request takes minutes.** Cold start: image pull, ComfyUI boot, then
-~18.5 GB onto the GPU. Set `FLUX2KLEIN_MIN_CONTAINERS=1` if latency matters more
+18–26 GB onto the GPU. Set `FLUX2KLEIN_MIN_CONTAINERS=1` if latency matters more
 than idle cost.

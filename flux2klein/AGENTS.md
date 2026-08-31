@@ -25,7 +25,7 @@ way, and N copies of them lose those fixes one at a time.
 ## What differs from ideogram4
 
 **One transformer, not two.** `CFGGuider` replaces `DualModelGuider`, so the
-working set during sampling is ~18.5 GB rather than ~18.9 GB across a pair, and
+working set during sampling is ~18 GB rather than ~18.9 GB across a pair, and
 peak VRAM is bounded by a single 9.4 GB checkpoint plus the 8.7 GB encoder.
 
 **A real negative prompt.** The graph encodes it with a second `CLIPTextEncode`
@@ -33,6 +33,18 @@ rather than `ConditioningZeroOut`, so `negative_prompt` is a genuine input —
 on the `base` variant. The `distilled` checkpoint is guidance-distilled and
 ignores both CFG and the negative branch; the node surfaces that in its `info`
 output rather than failing, because the request is still valid.
+
+**The text encoder belongs to the variant, not the service.** `base` and
+`distilled` share Comfy-Org's fp8mixed encoder; `base-uncensored` pairs the base
+transformer with an abliterated bf16 one. It is deliberately not an independent
+request field: an encoder is validated against a checkpoint, and letting callers
+mix them arbitrarily would silently degrade output rather than fail.
+
+ComfyUI loads it by the same path — `detect_te_model` maps a standard Qwen3-8B
+state dict to `TEModel.QWEN3_8B`, which under `CLIPType.FLUX2` routes to
+`klein_te(model_type="qwen3_8b")` with `KleinTokenizer8B`. A Qwen3-VL detection
+lands on the same encoder for FLUX2, so the load works whether or not the
+donor checkpoint kept its visual tower.
 
 **Natural-language prompts.** No structured-caption requirement, unlike Ideogram
 4. There is no `/caption-template` endpoint here.

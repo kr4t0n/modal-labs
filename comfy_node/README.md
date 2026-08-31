@@ -72,6 +72,7 @@ genuinely supported because that graph encodes it separately.
 | --- | --- | --- | --- |
 | `base` | 20 | 5.0 | Undistilled. Responds to CFG and negative prompts. |
 | `distilled` | 4 | 1.0 | Guidance-distilled. Ignores CFG and negative prompts. |
+| `base-uncensored` | 20 | 5.0 | As `base`, but with an abliterated text encoder — no prompt-stage safety filtering. |
 
 Leave `override_sampler` off and the server applies those defaults. Pushing the
 distilled variant above cfg 1 degrades it rather than sharpening it.

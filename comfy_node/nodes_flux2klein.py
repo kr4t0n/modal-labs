@@ -17,7 +17,7 @@ from ._runtime import (
 
 ENV_URL = "FLUX2KLEIN_MODAL_URL"
 CATEGORY = "FLUX.2 klein (Modal)"
-VARIANTS = ["base", "distilled"]
+VARIANTS = ["base", "distilled", "base-uncensored"]
 
 
 class Flux2KleinModal:

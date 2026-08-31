@@ -81,6 +81,15 @@ async def test_explicit_steps_and_cfg_override_the_variant(wired):
 
 
 @pytest.mark.asyncio
+async def test_uncensored_variant_swaps_only_the_encoder(wired):
+    _, client, state = wired
+    await client.post("/generate", json={"prompt": "a test", "variant": "base-uncensored"})
+    submitted = state["prompts"][0]["prompt"]
+    assert submitted["load_clip"]["inputs"]["clip_name"] == workflow.UNCENSORED_TEXT_ENCODER
+    assert submitted["load_unet"]["inputs"]["unet_name"] == "flux-2-klein-base-9b-fp8.safetensors"
+
+
+@pytest.mark.asyncio
 async def test_variants_endpoint_reports_sampler_defaults(wired):
     _, client, _ = wired
     body = (await client.get("/variants")).json()

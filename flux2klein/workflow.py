@@ -53,8 +53,14 @@ __all__ = [
 ]
 
 # --- Weight files -----------------------------------------------------------
-# The two transformers are gated on Hugging Face; see app.py for the token.
+# Everything except the VAE is gated on Hugging Face; see app.py for the token.
 TEXT_ENCODER = "qwen_3_8b_fp8mixed.safetensors"
+
+# An abliterated Qwen3-8B: the refusal direction is orthogonalised out of the
+# encoder's mid/late layers. Same architecture, so ComfyUI's `flux2` CLIP type
+# loads it by the same path — but bf16 rather than fp8mixed, so it is roughly
+# twice the size on disk and in VRAM.
+UNCENSORED_TEXT_ENCODER = "qwen_3_8b_uncensored_bf16.safetensors"
 # Not flux2-vae: the klein templates ship the small-decoder autoencoder.
 VAE = "full_encoder_small_decoder.safetensors"
 
@@ -65,12 +71,18 @@ CLIP_TYPE = "flux2"
 
 @dataclass(frozen=True)
 class Variant:
-    """A checkpoint and the sampler settings it was tuned for."""
+    """A checkpoint, its text encoder, and the sampler settings it was tuned for.
+
+    The encoder is part of the variant rather than a global: swapping it changes
+    what the model will render, so it should not be settable independently of
+    the checkpoint it was validated against.
+    """
 
     checkpoint: str
     steps: int
     cfg: float
     description: str
+    text_encoder: str = TEXT_ENCODER
 
 
 # Values taken from the official templates rather than inferred: the base
@@ -89,6 +101,18 @@ VARIANTS: dict[str, Variant] = {
         cfg=1.0,
         description="Guidance-distilled, 4 steps. Ignores CFG and negative prompts.",
     ),
+    # Same transformer and schedule as `base`; only the encoder differs, so
+    # differences in output come from prompt handling alone.
+    "base-uncensored": Variant(
+        checkpoint="flux-2-klein-base-9b-fp8.safetensors",
+        steps=20,
+        cfg=5.0,
+        description=(
+            "As base, with an abliterated text encoder: prompt-stage refusals "
+            "are removed. bf16 encoder, so ~8 GB more VRAM than base."
+        ),
+        text_encoder=UNCENSORED_TEXT_ENCODER,
+    ),
 }
 DEFAULT_VARIANT = "base"
 
@@ -101,6 +125,7 @@ class GenerationParams:
     negative_prompt: str
     variant: str
     checkpoint: str
+    text_encoder: str
     width: int
     height: int
     seed: int
@@ -146,6 +171,7 @@ def resolve_params(
         negative_prompt=negative_prompt,
         variant=variant,
         checkpoint=spec.checkpoint,
+        text_encoder=spec.text_encoder,
         width=snap_side(width),
         height=snap_side(height),
         seed=normalise_seed(seed),
@@ -171,7 +197,7 @@ def build_workflow(params: GenerationParams) -> dict[str, Any]:
         "load_clip": {
             "class_type": "CLIPLoader",
             "inputs": {
-                "clip_name": TEXT_ENCODER,
+                "clip_name": params.text_encoder,
                 "type": CLIP_TYPE,
                 "device": "default",
             },

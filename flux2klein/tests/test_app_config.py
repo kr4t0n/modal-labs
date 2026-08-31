@@ -39,7 +39,9 @@ def test_downloaded_layout_matches_what_the_graph_asks_for():
     destinations = {m.destination for m in app.MODEL_FILES}
     for variant in workflow.VARIANTS.values():
         assert f"diffusion_models/{variant.checkpoint}" in destinations
-    assert f"text_encoders/{workflow.TEXT_ENCODER}" in destinations
+        # Every variant's encoder must actually be downloaded, or the graph
+        # validates locally and fails at queue time on the remote.
+        assert f"text_encoders/{variant.text_encoder}" in destinations
     assert f"vae/{workflow.VAE}" in destinations
 
 
@@ -50,10 +52,16 @@ def test_every_downloaded_file_sits_under_a_configured_search_path():
         assert model.destination.split("/")[0] in configured, model.destination
 
 
+def test_hf_secret_name_default():
+    """`modal deploy` resolves this name; a wrong one fails the whole deploy."""
+    assert app.HF_SECRET_NAME == "huggingface-secret"
+
+
 def test_gated_repos_are_flagged():
     """The two transformers need an HF token; mislabelling them hides the 401."""
     gated = {m.repo_id for m in app.MODEL_FILES if m.gated}
     assert gated == {
         "black-forest-labs/FLUX.2-klein-base-9b-fp8",
         "black-forest-labs/FLUX.2-klein-9b-fp8",
+        "ponpoke/flux2-klein-9b-uncensored-text-encoder",
     }
