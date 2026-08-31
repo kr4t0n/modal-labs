@@ -10,6 +10,7 @@ management — it runs unchanged on a CPU-only install.
 | **Ideogram 4 (Modal)** | Ideogram 4 (Modal) |
 | **Ideogram 4 Caption Template (Modal)** | Ideogram 4 (Modal) |
 | **FLUX.2 klein (Modal)** | FLUX.2 klein (Modal) |
+| **WAI-illustrious (Modal)** | WAI-illustrious (Modal) |
 
 Nodes whose endpoint is unconfigured simply raise a clear error when run, so
 installing the package without deploying every service is fine.
@@ -72,12 +73,21 @@ genuinely supported because that graph encodes it separately.
 | --- | --- | --- | --- |
 | `base` | 20 | 5.0 | Undistilled. Responds to CFG and negative prompts. |
 | `distilled` | 4 | 1.0 | Guidance-distilled. Ignores CFG and negative prompts. |
-| `base-uncensored` | 20 | 5.0 | As `base`, but with an abliterated text encoder — no prompt-stage safety filtering. |
+| `ponpoke-uncensored` | 20 | 5.0 | As `base`, but with an abliterated text encoder — no prompt-stage safety filtering. |
 
 Leave `override_sampler` off and the server applies those defaults. Pushing the
 distilled variant above cfg 1 degrades it rather than sharpening it.
 
-For both render nodes, set `aspect_ratio` to `custom` to use the width/height
+**WAI-illustrious (Modal)** → `IMAGE`, `INT` (seed), `STRING` (info)
+
+Danbooru tags rather than prose: `1girl, solo, silver hair, masterpiece`. Full
+SDXL sampler controls — `steps`, `cfg`, `sampler_name`, `scheduler` and
+`clip_skip`. Leave `clip_skip` at `-2`: booru-tagged SDXL finetunes are trained
+against the penultimate CLIP layer, and `-1` quietly degrades prompt adherence
+rather than erroring. The negative prompt is pre-filled with the standard
+Danbooru negative; clear it if you do not want it.
+
+For all render nodes, set `aspect_ratio` to `custom` to use the width/height
 widgets, and use the optional `endpoint` widget to override the environment if
 you run more than one deployment of a service.
 
@@ -109,6 +119,7 @@ type: Opaque
 stringData:
   IDEOGRAM4_MODAL_URL: https://<workspace>--ideogram4-comfyui-ideogram4-web.modal.run
   FLUX2KLEIN_MODAL_URL: https://<workspace>--flux2klein-comfyui-flux2klein-web.modal.run
+  WAIILLUSTRIOUS_MODAL_URL: https://<workspace>--waiillustrious-comfyui-waiillustrious-web.modal.run
   MODAL_KEY: wk-...
   MODAL_SECRET: ws-...
 ---

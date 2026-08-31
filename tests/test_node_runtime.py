@@ -69,6 +69,7 @@ def test_both_services_register_their_nodes():
         "Ideogram4Modal",
         "Ideogram4ModalCaptionTemplate",
         "Flux2KleinModal",
+        "WaiIllustriousModal",
     }
     assert set(comfy_node.NODE_DISPLAY_NAME_MAPPINGS) == set(comfy_node.NODE_CLASS_MAPPINGS)
 
@@ -107,6 +108,24 @@ def test_both_services_register_their_nodes():
                 "cfg",
             ],
         ),
+        (
+            "WaiIllustriousModal",
+            [
+                "prompt",
+                "negative_prompt",
+                "aspect_ratio",
+                "megapixels",
+                "width",
+                "height",
+                "batch_size",
+                "seed",
+                "steps",
+                "cfg",
+                "sampler_name",
+                "scheduler",
+                "clip_skip",
+            ],
+        ),
     ],
 )
 def test_widget_names_and_order_are_stable(node_id, expected):
@@ -117,7 +136,7 @@ def test_widget_names_and_order_are_stable(node_id, expected):
 
 
 def test_nodes_return_an_image_seed_and_info():
-    for node_id in ("Ideogram4Modal", "Flux2KleinModal"):
+    for node_id in ("Ideogram4Modal", "Flux2KleinModal", "WaiIllustriousModal"):
         node = comfy_node.NODE_CLASS_MAPPINGS[node_id]
         assert node.RETURN_TYPES == ("IMAGE", "INT", "STRING")
         assert node.RETURN_NAMES == ("image", "seed", "info")

@@ -11,6 +11,7 @@ environment and tooling.
 | --- | --- |
 | [`ideogram4/`](ideogram4/) | Ideogram 4 text-to-image, served as a ComfyUI API so a local ComfyUI can use it as a remote model endpoint |
 | [`flux2klein/`](flux2klein/) | FLUX.2 [klein] 9B text-to-image, same pattern — natural-language prompts, base and 4-step distilled variants |
+| [`waiillustrious/`](waiillustrious/) | WAI-illustrious-SDXL, an Illustrious-XL anime finetune driven by Danbooru tags — a single 6.8 GB checkpoint that runs on a 24 GB A10 |
 
 Both expose one URL that is simultaneously a real ComfyUI server and a typed
 `/generate` contract, so a CPU-only ComfyUI can stay the UI while the GPU work
