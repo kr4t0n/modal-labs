@@ -15,10 +15,10 @@ Two checkpoints ship, and the choice matters:
 | --- | --- | --- | --- |
 | `base` | 20 | 5.0 | Default. Undistilled, responds to CFG and negative prompts. |
 | `distilled` | 4 | 1.0 | ~5x fewer steps. Guidance-distilled, so it ignores CFG and negative prompts. |
-| `base-uncensored` | 20 | 5.0 | As `base`, with an abliterated text encoder — see below. |
+| `ponpoke-uncensored` | 20 | 5.0 | As `base`, with an abliterated text encoder — see below. |
 
 The variant selects the transformer *and* its text encoder, because the two are
-validated together. `base-uncensored` differs from `base` in the encoder alone:
+validated together. `ponpoke-uncensored` differs from `base` in the encoder alone:
 same transformer, same schedule, so any difference in output comes from prompt
 handling.
 
@@ -30,7 +30,7 @@ caption required — and supports a real negative prompt.
 > each agreement with the account whose token you use. This repository ships no
 > weights.
 
-> **`base-uncensored`.** Its encoder is
+> **`ponpoke-uncensored`.** Its encoder is
 > [`ponpoke/flux2-klein-9b-uncensored-text-encoder`](https://huggingface.co/ponpoke/flux2-klein-9b-uncensored-text-encoder),
 > an *abliterated* Qwen3-8B: the refusal direction is orthogonalised out of the
 > encoder's mid and late layers, so prompt-stage safety filtering no longer
@@ -167,7 +167,7 @@ All read at deploy time; see [`.env.example`](.env.example).
 
 ~44 GB of weights sit on disk, but only one transformer and one encoder load at
 a time. The working set is about **18 GB** for `base` and `distilled`, and about
-**26 GB** for `base-uncensored`, whose encoder is bf16 rather than fp8mixed.
+**26 GB** for `ponpoke-uncensored`, whose encoder is bf16 rather than fp8mixed.
 Both are lighter than the ideogram4 service.
 
 The fp8 checkpoints want fp8 tensor cores, meaning compute capability 8.9+
@@ -184,8 +184,15 @@ uv run python client.py generate "benchmark" --variant distilled   # cold, ignor
 uv run python client.py generate "benchmark" --variant distilled   # warm, compare duration_s
 ```
 
-The `distilled` variant is the far bigger lever: 4 steps against 20 is roughly a
-5x cut in sampling cost, which dwarfs any GPU choice.
+The `distilled` variant is the far bigger lever, and it cuts on two axes at
+once: 4 steps against 20, *and* one transformer pass per step instead of two,
+because ComfyUI skips the unconditional branch when cfg is 1. That is 4
+transformer evaluations against 40 — a ~10x reduction in sampling work, which
+dwarfs any GPU choice.
+
+Wall-clock gain is smaller than 10x: text encoding and VAE decode happen once
+per image regardless, so they become a proportionally larger share of a short
+render. Measure before assuming a number.
 
 ## Project structure
 

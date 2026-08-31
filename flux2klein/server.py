@@ -26,7 +26,7 @@ class GenerateRequest(BaseGenerateRequest):
         default="",
         description="Only meaningful on the base variant; the distilled one ignores it.",
     )
-    variant: Literal["base", "distilled", "base-uncensored"] = Field(
+    variant: Literal["base", "distilled", "ponpoke-uncensored"] = Field(
         default=workflow.DEFAULT_VARIANT,
         description=(
             "'base' is undistilled (20 steps, cfg 5). 'distilled' is a 4-step "

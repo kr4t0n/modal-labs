@@ -102,7 +102,7 @@ EXTRA_MODEL_PATHS_YAML = service.extra_model_paths_yaml(
 )
 
 # One transformer and one encoder are resident at a time: ~18 GB for base and
-# distilled, ~26 GB for base-uncensored (bf16 encoder). Still smaller than the
+# distilled, ~26 GB for ponpoke-uncensored (bf16 encoder). Still smaller than the
 # ideogram4 service. Compare cost per image, not per hour — see README.
 SETTINGS = service.Settings.from_env("FLUX2KLEIN", gpu="H100")
 

@@ -101,9 +101,10 @@ VARIANTS: dict[str, Variant] = {
         cfg=1.0,
         description="Guidance-distilled, 4 steps. Ignores CFG and negative prompts.",
     ),
-    # Same transformer and schedule as `base`; only the encoder differs, so
-    # differences in output come from prompt handling alone.
-    "base-uncensored": Variant(
+    # Named for the encoder's author, since that is the only thing that differs:
+    # same transformer and schedule as `base`, so any change in output comes
+    # from prompt handling alone.
+    "ponpoke-uncensored": Variant(
         checkpoint="flux-2-klein-base-9b-fp8.safetensors",
         steps=20,
         cfg=5.0,

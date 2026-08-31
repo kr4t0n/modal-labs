@@ -35,7 +35,7 @@ ignores both CFG and the negative branch; the node surfaces that in its `info`
 output rather than failing, because the request is still valid.
 
 **The text encoder belongs to the variant, not the service.** `base` and
-`distilled` share Comfy-Org's fp8mixed encoder; `base-uncensored` pairs the base
+`distilled` share Comfy-Org's fp8mixed encoder; `ponpoke-uncensored` pairs the base
 transformer with an abliterated bf16 one. It is deliberately not an independent
 request field: an encoder is validated against a checkpoint, and letting callers
 mix them arbitrarily would silently degrade output rather than fail.
