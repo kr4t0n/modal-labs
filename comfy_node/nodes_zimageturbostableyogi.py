@@ -1,0 +1,151 @@
+"""Z-Image Turbo (Stable Yogi) node, rendering on a remote Modal deployment.
+
+A community finetune, not Alibaba's stock Z-Image Turbo — named accordingly so
+the two are not confused in a graph.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from ._runtime import (
+    ProgressMirror,
+    common_geometry_inputs,
+    endpoint,
+    endpoint_inputs,
+    geometry_payload,
+    post,
+    to_tensor,
+)
+
+ENV_URL = "ZIMAGETURBOSTABLEYOGI_MODAL_URL"
+CATEGORY = "Z-Image Turbo Stable Yogi (Modal)"
+
+SAMPLERS = ["res_multistep", "euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde"]
+SCHEDULERS = ["simple", "normal", "karras", "sgm_uniform", "beta", "exponential"]
+
+
+class ZImageTurboStableYogiModal:
+    """Text to image on the remote Z-Image Turbo (Stable Yogi) deployment."""
+
+    @classmethod
+    def INPUT_TYPES(cls) -> dict[str, Any]:
+        return {
+            "required": {
+                "prompt": (
+                    "STRING",
+                    {
+                        "multiline": True,
+                        "default": "a harbour at dawn, fishing boats and pastel houses, soft light",
+                    },
+                ),
+                "negative_prompt": (
+                    "STRING",
+                    {
+                        "multiline": True,
+                        "default": "",
+                        "tooltip": "Has no effect at the default cfg 1; raise cfg to use it.",
+                    },
+                ),
+                **common_geometry_inputs(),
+                "steps": ("INT", {"default": 8, "min": 1, "max": 200}),
+                "cfg": (
+                    "FLOAT",
+                    {
+                        "default": 1.0,
+                        "min": 0.0,
+                        "max": 100.0,
+                        "step": 0.1,
+                        "tooltip": "This family samples at 1. Raise only if output looks undercooked.",
+                    },
+                ),
+                "sampler_name": (SAMPLERS, {"default": "res_multistep"}),
+                "scheduler": (SCHEDULERS, {"default": "simple"}),
+                "shift": (
+                    "FLOAT",
+                    {
+                        "default": 3.0,
+                        "min": 0.01,
+                        "max": 100.0,
+                        "step": 0.01,
+                        "tooltip": "ModelSamplingAuraFlow shift; 3.0 is what Z-Image declares.",
+                    },
+                ),
+            },
+            "optional": endpoint_inputs(ENV_URL),
+            # Lets the progress bar attach to this node rather than the graph.
+            "hidden": {"unique_id": "UNIQUE_ID"},
+        }
+
+    RETURN_TYPES = ("IMAGE", "INT", "STRING")
+    RETURN_NAMES = ("image", "seed", "info")
+    FUNCTION = "generate"
+    CATEGORY = CATEGORY
+    DESCRIPTION = (
+        "Render with Stable Yogi's Z-Image Turbo finetune on a Modal-hosted "
+        "ComfyUI and return the image."
+    )
+
+    def generate(
+        self,
+        prompt: str,
+        negative_prompt: str,
+        aspect_ratio: str,
+        megapixels: float,
+        width: int,
+        height: int,
+        batch_size: int,
+        seed: int,
+        steps: int,
+        cfg: float,
+        sampler_name: str,
+        scheduler: str,
+        shift: float,
+        endpoint: str = "",
+        timeout_s: float = 900.0,
+        unique_id: str | None = None,
+    ):
+        url = _endpoint_url(endpoint)
+        client_id = uuid.uuid4().hex
+        payload: dict[str, Any] = {
+            "client_id": client_id,
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "batch_size": batch_size,
+            "seed": seed,
+            "steps": steps,
+            "cfg": cfg,
+            "sampler_name": sampler_name,
+            "scheduler": scheduler,
+            "shift": shift,
+            # Give the remote a little slack so it reports the timeout rather
+            # than the socket dying underneath us.
+            "timeout_s": max(timeout_s - 15.0, 30.0),
+            **geometry_payload(aspect_ratio, megapixels, width, height),
+        }
+
+        with ProgressMirror(url, client_id, unique_id):
+            result = post(url, "/generate", payload, timeout_s)
+
+        params = result.get("params", {})
+        notes = ""
+        if cfg <= 1.0 and negative_prompt.strip():
+            notes = " (negative prompt inactive at cfg 1)"
+        info = (
+            f"seed={params.get('seed')} steps={params.get('steps')} "
+            f"cfg={params.get('cfg')} {params.get('sampler_name')}/{params.get('scheduler')} "
+            f"{params.get('width')}x{params.get('height')} "
+            f"in {result.get('duration_s')}s{notes}"
+        )
+        return (to_tensor(result["images"]), int(params.get("seed", seed)), info)
+
+
+def _endpoint_url(override: str) -> str:
+    """The widget arg shadows the imported `endpoint`, hence the indirection."""
+    return endpoint(override, ENV_URL)
+
+
+NODE_CLASS_MAPPINGS = {"ZImageTurboStableYogiModal": ZImageTurboStableYogiModal}
+
+NODE_DISPLAY_NAME_MAPPINGS = {"ZImageTurboStableYogiModal": "Z-Image Turbo Stable Yogi (Modal)"}

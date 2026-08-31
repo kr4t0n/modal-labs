@@ -1,9 +1,9 @@
 # AGENTS.md — FLUX.2 klein 9B on Modal
 
 Context for anyone changing this deployment. It is a deliberate sibling of
-[`../ideogram4`](../ideogram4/AGENTS.md); read that one first, since the
-architectural reasoning (why a real ComfyUI runs in the container rather than a
-hand-written sampler) applies here unchanged and is not repeated.
+the other services here. The architectural reasoning — why a real ComfyUI runs
+in the container rather than a hand-written sampler — lives in the root
+[`AGENTS.md`](../AGENTS.md) and is not repeated.
 
 This file covers only what differs.
 

@@ -9,14 +9,16 @@ environment and tooling.
 
 | Project | What it does |
 | --- | --- |
-| [`ideogram4/`](ideogram4/) | Ideogram 4 text-to-image, served as a ComfyUI API so a local ComfyUI can use it as a remote model endpoint |
 | [`flux2klein/`](flux2klein/) | FLUX.2 [klein] 9B text-to-image, same pattern — natural-language prompts, base and 4-step distilled variants |
-| [`waiillustrious/`](waiillustrious/) | WAI-illustrious-SDXL, an Illustrious-XL anime finetune driven by Danbooru tags — a single 6.8 GB checkpoint that runs on a 24 GB A10 |
 | [`ultra/`](ultra/) | ULTRA, a Krea 2 finetune fetched from Civitai with a verified digest — 8-step turbo sampling |
+| [`zimageturbostableyogi/`](zimageturbostableyogi/) | Stable Yogi's Z-Image Turbo finetune — the cheapest of the set, a 6 GB fp8 model on a 24 GB L4 |
 
 Both expose one URL that is simultaneously a real ComfyUI server and a typed
 `/generate` contract, so a CPU-only ComfyUI can stay the UI while the GPU work
 happens on Modal.
+
+Retired services live in [`deprecated/`](deprecated/) — kept as reference, not
+built or tested. See its README before reviving one.
 
 ## Shared code
 
@@ -36,7 +38,7 @@ uv run modal setup        # once, to authenticate
 ```
 
 Then follow the project's own README — for example
-[`ideogram4/README.md`](ideogram4/README.md).
+[`flux2klein/README.md`](flux2klein/README.md).
 
 ## Development
 

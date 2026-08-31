@@ -1,0 +1,140 @@
+{
+  "load_unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "zimageturbostableyogi.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "Z-Image Turbo (Stable Yogi)"
+    }
+  },
+  "model_sampling": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "model": [
+        "load_unet",
+        0
+      ],
+      "shift": 3.0
+    },
+    "_meta": {
+      "title": "Sampling shift"
+    }
+  },
+  "load_clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_4b_fp8_mixed.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "Qwen3 4B text encoder"
+    }
+  },
+  "positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "load_clip",
+        0
+      ],
+      "text": "a harbour at dawn, fishing boats and pastel houses, soft light"
+    },
+    "_meta": {
+      "title": "Prompt"
+    }
+  },
+  "negative": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "positive",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Zeroed conditioning"
+    }
+  },
+  "latent": {
+    "class_type": "EmptySD3LatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "Empty latent"
+    }
+  },
+  "sample": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "model_sampling",
+        0
+      ],
+      "seed": 0,
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "res_multistep",
+      "scheduler": "simple",
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "latent_image": [
+        "latent",
+        0
+      ],
+      "denoise": 1.0
+    },
+    "_meta": {
+      "title": "Sample"
+    }
+  },
+  "load_vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "_meta": {
+      "title": "VAE"
+    }
+  },
+  "decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "sample",
+        0
+      ],
+      "vae": [
+        "load_vae",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Decode"
+    }
+  },
+  "save_image": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "decode",
+        0
+      ],
+      "filename_prefix": "zimageturbostableyogi"
+    },
+    "_meta": {
+      "title": "Save"
+    }
+  }
+}

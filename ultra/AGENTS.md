@@ -1,9 +1,8 @@
 # AGENTS.md — ULTRA (Krea 2) on Modal
 
-Context for anyone changing this deployment. It is a sibling of
-[`../ideogram4`](../ideogram4/AGENTS.md); the architectural reasoning there —
-why a real ComfyUI runs in the container rather than a hand-written sampler —
-applies unchanged. This file covers what differs.
+Context for anyone changing this deployment. The architectural reasoning — why a
+real ComfyUI runs in the container rather than a hand-written sampler — lives in
+the root [`AGENTS.md`](../AGENTS.md). This file covers what differs.
 
 ## Where the code lives
 

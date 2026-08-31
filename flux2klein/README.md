@@ -2,7 +2,7 @@
 
 Runs Black Forest Labs' [FLUX.2 klein](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B)
 9B text-to-image model on a Modal GPU and exposes it as a **ComfyUI server**.
-Same shape as [`../ideogram4`](../ideogram4/): point a local or clustered
+Same shape as the other services here: point a local or clustered
 ComfyUI at the resulting URL and render remotely.
 
 FLUX.2 klein is the compact member of the FLUX.2 family — a 9B transformer with

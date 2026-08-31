@@ -3,6 +3,24 @@
 Repository-level context. Each project directory has its own `AGENTS.md` with
 the design decisions specific to that deployment; read both.
 
+## Why a real ComfyUI, and not a sampling loop
+
+Every service here runs a headless ComfyUI on the GPU with a thin HTTP layer in
+front, rather than loading weights with `diffusers` and writing a sampling loop.
+
+The reason is that the interesting parts of a modern image model — noise
+schedules, guidance variants, quantised kernels, per-architecture text-encoder
+taps — are all upstream code, fixed and tuned by people who work on it full
+time. Reimplementing them buys nothing and drifts silently: the failure mode is
+a plausible image that is subtly wrong, not an exception.
+
+It also answers the requirement directly. Because ComfyUI *is* the server, the
+deployed URL speaks the ComfyUI protocol with no translation layer, so any
+ComfyUI client works against it unmodified.
+
+The cost is a heavier container and a process to supervise. `comfyui_modal`
+absorbs both.
+
 ## Shape of the repository
 
 A single `uv` environment at the root serves every project. Projects are flat
@@ -73,7 +91,7 @@ are all pinned. Unpinned upstreams have broken deployments silently before.
 Tests must run offline with no Modal credentials and no GPU. That means the
 testable surface is the pure logic — model graphs, parameter resolution, request
 mapping — while anything requiring the real service is a CLI subcommand a human
-runs against a live deployment (see `ideogram4/client.py validate`).
+runs against a live deployment (see any service's `client.py validate`).
 
 CI additionally imports each `app.py` — in a separate process per project,
 because every service defines modules named `app`, `server` and `workflow`.

@@ -7,11 +7,9 @@ management — it runs unchanged on a CPU-only install.
 
 | Node | Category |
 | --- | --- |
-| **Ideogram 4 (Modal)** | Ideogram 4 (Modal) |
-| **Ideogram 4 Caption Template (Modal)** | Ideogram 4 (Modal) |
 | **FLUX.2 klein (Modal)** | FLUX.2 klein (Modal) |
-| **WAI-illustrious (Modal)** | WAI-illustrious (Modal) |
 | **ULTRA / Krea 2 (Modal)** | ULTRA / Krea 2 (Modal) |
+| **Z-Image Turbo Stable Yogi (Modal)** | Z-Image Turbo Stable Yogi (Modal) |
 
 Nodes whose endpoint is unconfigured simply raise a clear error when run, so
 installing the package without deploying every service is fine.
@@ -98,6 +96,15 @@ Danbooru negative; clear it if you do not want it.
 Natural-language prompts. Defaults to Krea 2 turbo's 8 steps at cfg 1, where the
 negative prompt has no effect — the node says so in its `info` output if you fill
 one in anyway. Raise `cfg` to make it active.
+
+**Z-Image Turbo Stable Yogi (Modal)** → `IMAGE`, `INT` (seed), `STRING` (info)
+
+A community finetune, not Alibaba's stock Z-Image Turbo.
+
+Natural-language prompts at 8 steps, cfg 1, `res_multistep`. The `shift` widget
+drives `ModelSamplingAuraFlow`; leave it at 3.0 unless you know why you are
+changing it — the underlying node's own default of 1.73 gives a different noise
+schedule. As with ULTRA, the negative prompt is inert at cfg 1.
 
 For all render nodes, set `aspect_ratio` to `custom` to use the width/height
 widgets, and use the optional `endpoint` widget to override the environment if

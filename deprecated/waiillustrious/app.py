@@ -1,17 +1,14 @@
-"""Ideogram 4 on Modal, served as a remote ComfyUI API.
+"""WAI-illustrious-SDXL on Modal, served as a remote ComfyUI API.
 
-Ideogram 4 is a 9.3B single-stream diffusion transformer with open weights and
-first-class support in ComfyUI core. Rather than reimplement its sampling
-schedule, this deployment runs a real headless ComfyUI on a Modal GPU and puts a
-thin ASGI app in front of it. The resulting URL behaves like a ComfyUI server
-(`/prompt`, `/history`, `/view`, `/ws`, the web UI) and additionally answers a
-typed `/generate` contract that the bundled custom node calls.
+WAI-illustrious-SDXL is an Illustrious-XL finetune with native Danbooru tag
+understanding. It is a single ~6.8 GB fp16 SDXL checkpoint, so it is far lighter
+than the other two services here and runs comfortably on a 24 GB card.
 
-Only the model-specific parts live here — the weight table, the graph, the
-Modal object graph. The container image, the ComfyUI supervisor and the ASGI
-layer come from `comfyui_modal`.
+Distribution differs too: it lives on Civitai rather than Hugging Face. The
+download needs no credentials, but Civitai publishes a SHA256 and the fetch
+verifies it — a third-party CDN is worth checking rather than trusting.
 
-    modal run app.py::download_models   # one-off, ~30 GB into a Volume
+    modal run app.py::download_models   # one-off, ~6.8 GB into a Volume
     modal deploy app.py                 # the API
     modal serve app.py                  # the browser UI, ephemeral
 
@@ -29,10 +26,12 @@ HERE = Path(__file__).parent
 # `add_local_python_source` resolves modules through the local interpreter, so
 # both the sibling modules and the shared package at the repository root have to
 # be importable no matter which directory modal is invoked from.
-sys.path.insert(0, str(HERE.parent))
+# Retired: one level deeper than a live service, so the repository root
+# is two parents up rather than one.
+sys.path.insert(0, str(HERE.parent.parent))
 sys.path.insert(0, str(HERE))
 
-from comfyui_modal import service  # noqa: E402
+from comfyui_modal import service, weights  # noqa: E402
 from comfyui_modal.service import (  # noqa: E402
     COMFY_HOST,
     COMFY_PORT,
@@ -41,51 +40,39 @@ from comfyui_modal.service import (  # noqa: E402
     UI_PORT,
 )
 
-APP_NAME = "ideogram4-comfyui"
-CAPTION_TEMPLATE_PATH = "/root/assets/magic_prompt_template.txt"
+APP_NAME = "waiillustrious-comfyui"
 
-# --- Weights ----------------------------------------------------------------
-# Comfy-Org's mirror of the Ideogram 4 release, pre-split into ComfyUI's layout.
-# Downloading with `local_dir=MODELS_DIR` reproduces the repo's subdirectories,
-# which is exactly the layout extra_model_paths.yaml points at.
-MODEL_REPO = "Comfy-Org/Ideogram-4"
-MODEL_FILES = (
-    "diffusion_models/ideogram4_fp8_scaled.safetensors",
-    "diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
-    "text_encoders/qwen3vl_8b_fp8_scaled.safetensors",
-    "vae/flux2-vae.safetensors",
+
+CHECKPOINT_FILE = weights.CivitaiFile(
+    model_version_id=2883731,  # v17.0
+    file_id=2763986,
+    destination="checkpoints/waiIllustriousSDXL_v170.safetensors",
+    sha256="f116b0c78ff441467b0cdc8f1936e1ed18ea31e9997c7b132b1b8db533f0bd04",
 )
 
-EXTRA_MODEL_PATHS_YAML = service.extra_model_paths_yaml(
-    "ideogram4", ("diffusion_models", "text_encoders", "vae")
-)
+MODEL_FILES = (CHECKPOINT_FILE,)
+REQUIRED_MODELS = weights.destinations(MODEL_FILES)
 
-# 29.5 GB of fp8 weights total; ~18.9 GB is resident during sampling, once the
-# text encoder is offloaded. A 48 GB L40S therefore holds the lot and is roughly
-# half H100's hourly rate — but it is also slower, so compare cost per image
-# rather than per hour before switching. See README, "Choosing a GPU".
-SETTINGS = service.Settings.from_env("IDEOGRAM4", gpu="H100")
+EXTRA_MODEL_PATHS_YAML = service.extra_model_paths_yaml("waiillustrious", ("checkpoints",))
 
-models_volume = modal.Volume.from_name("ideogram4-models", create_if_missing=True)
+# One ~6.8 GB fp16 checkpoint, so a 24 GB A10 is ample and by far the cheapest
+# card that fits. SDXL is fp16 throughout, so the lack of fp8 tensor cores on
+# Ampere costs nothing here. See README, "Choosing a GPU".
+SETTINGS = service.Settings.from_env("WAIILLUSTRIOUS", gpu="A10")
 
-image = service.build_image(["workflow", "server", "comfyui_modal"]).add_local_file(
-    HERE / "assets" / "magic_prompt_template.txt", CAPTION_TEMPLATE_PATH
-)
+models_volume = modal.Volume.from_name("waiillustrious-models", create_if_missing=True)
+
+image = service.build_image(["workflow", "server", "comfyui_modal"])
 
 app = modal.App(APP_NAME, image=image)
 
 
 @app.function(volumes={MODELS_DIR: models_volume}, timeout=3600)
-def download_models() -> list[str]:
-    """Populate the weights Volume. Idempotent; re-running verifies checksums."""
-    from huggingface_hub import hf_hub_download
-
-    paths = []
-    for filename in MODEL_FILES:
-        print(f"fetching {filename} ...")
-        paths.append(hf_hub_download(repo_id=MODEL_REPO, filename=filename, local_dir=MODELS_DIR))
+def download_models(force: bool = False) -> list[str]:
+    """Fetch the checkpoint from Civitai, verifying its published digest."""
+    written = weights.download_weights(MODEL_FILES, MODELS_DIR, force=force)
     models_volume.commit()
-    return paths
+    return written
 
 
 @app.cls(
@@ -98,7 +85,7 @@ def download_models() -> list[str]:
     max_containers=SETTINGS.max_containers,
 )
 @modal.concurrent(max_inputs=SETTINGS.concurrent_inputs, target_inputs=SETTINGS.concurrent_inputs)
-class Ideogram4:
+class WaiIllustrious:
     """A container running ComfyUI, fronted by the ASGI app in server.py."""
 
     @modal.enter()
@@ -106,7 +93,7 @@ class Ideogram4:
         self.process = service.launch_comfyui(
             COMFY_PORT,
             COMFY_HOST,
-            required_models=MODEL_FILES,
+            required_models=REQUIRED_MODELS,
             extra_paths_yaml=EXTRA_MODEL_PATHS_YAML,
         )
         service.wait_for_comfyui(self.process)
@@ -119,7 +106,7 @@ class Ideogram4:
     def web(self):
         from server import create_app
 
-        return create_app(COMFY_URL, CAPTION_TEMPLATE_PATH)
+        return create_app(COMFY_URL)
 
     @modal.method()
     def generate(self, **kwargs) -> tuple[dict, list[bytes]]:
@@ -150,40 +137,43 @@ def ui() -> None:
     """The ComfyUI web interface, for `modal serve app.py`.
 
     Proxy auth is off by default because browsers cannot attach the required
-    headers. Serve it ephemerally, or set IDEOGRAM4_UI_REQUIRE_AUTH=1 and drive
-    it from a client that can.
+    headers. Serve it ephemerally, or set WAIILLUSTRIOUS_UI_REQUIRE_AUTH=1 and
+    drive it from a client that can.
     """
     service.launch_comfyui(
         UI_PORT,
         "0.0.0.0",
-        required_models=MODEL_FILES,
+        required_models=REQUIRED_MODELS,
         extra_paths_yaml=EXTRA_MODEL_PATHS_YAML,
     )
 
 
 @app.local_entrypoint()
 def main(
-    prompt: str = "a vintage travel poster for the rings of Saturn, bold type reading 'SATURN'",
+    prompt: str = "1girl, solo, silver hair, red eyes, city at night, masterpiece, best quality",
     output_dir: str = "outputs",
-    preset: str = "Default",
-    width: int = 1024,
-    height: int = 1024,
+    width: int = 832,
+    height: int = 1216,
+    steps: int = 28,
     seed: int = -1,
     batch_size: int = 1,
 ) -> None:
     """End-to-end smoke test: `modal run app.py`."""
-    params, images = Ideogram4().generate.remote(
+    params, images = WaiIllustrious().generate.remote(
         prompt=prompt,
-        preset=preset,
         width=width,
         height=height,
+        steps=steps,
         seed=None if seed < 0 else seed,
         batch_size=batch_size,
     )
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     for index, data in enumerate(images):
-        path = destination / f"ideogram4_{params['seed']}_{index}.png"
+        path = destination / f"wai_{params['seed']}_{index}.png"
         path.write_bytes(data)
         print(f"wrote {path} ({len(data) / 1e6:.2f} MB)")
-    print(f"seed={params['seed']} steps={params['steps']} {params['width']}x{params['height']}")
+    print(
+        f"seed={params['seed']} steps={params['steps']} cfg={params['cfg']} "
+        f"{params['width']}x{params['height']}"
+    )
