@@ -102,6 +102,7 @@ def _register_extra_routes(web_app: FastAPI) -> None:
                     "filename": spec.filename,
                     "description": spec.description,
                     "trained_on": spec.trained_on,
+                    "trigger_words": list(spec.trigger_words),
                 }
                 for name, spec in workflow.LORAS.items()
             },

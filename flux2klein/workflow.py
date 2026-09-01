@@ -127,6 +127,10 @@ class Lora:
     # Adapters are trained against one transformer; applying to another is not
     # an error, it just may not behave as trained.
     trained_on: str = "base"
+    # Words the adapter was trained to respond to. Omitting them from a prompt
+    # is the usual reason a LoRA "does nothing" — it loads fine and simply is
+    # not invoked, so the registry carries them where callers can see them.
+    trigger_words: tuple[str, ...] = ()
 
 
 # A registry rather than a free-form filename: the weights have to be fetched
@@ -136,6 +140,14 @@ LORAS: dict[str, Lora] = {
     "snofs-v1.4": Lora(
         filename="klein_snofs_v1_4.safetensors",
         description="Ashen3 SNOFS v1.4 — a LoKr adapter trained on klein 9B.",
+    ),
+    "realstockings-v2": Lora(
+        filename="RealStockingsV2.safetensors",
+        description=(
+            "lajmar Stockings v2 (Lace Black & Tan) — a standard LoRA trained "
+            "on klein 9B with ai-toolkit."
+        ),
+        trigger_words=("stockings", "RealStockings"),
     ),
 }
 

@@ -20,6 +20,7 @@ for _shared in ("workflow", "server", "app"):
 
 import app  # noqa: E402
 import workflow  # noqa: E402
+from comfyui_modal import weights  # noqa: E402
 
 
 def test_extra_model_paths_is_valid_yaml_for_the_volume():
@@ -59,7 +60,11 @@ def test_hf_secret_name_default():
 
 def test_gated_repos_are_flagged():
     """The two transformers need an HF token; mislabelling them hides the 401."""
-    gated = {m.repo_id for m in app.MODEL_FILES if m.gated}
+    # Only Hugging Face files carry a gated flag; Civitai ones are token-gated
+    # by the whole model, not per repo.
+    gated = {
+        m.repo_id for m in app.MODEL_FILES if isinstance(m, weights.HuggingFaceFile) and m.gated
+    }
     assert gated == {
         "black-forest-labs/FLUX.2-klein-base-9b-fp8",
         "black-forest-labs/FLUX.2-klein-9b-fp8",
@@ -77,3 +82,19 @@ def test_every_registered_lora_is_downloaded():
 def test_loras_folder_is_a_configured_search_path():
     section = yaml.safe_load(app.EXTRA_MODEL_PATHS_YAML)["flux2klein"]
     assert section["loras"] == "loras"
+
+
+def test_civitai_sourced_adapters_pin_a_digest():
+    """Civitai offers no integrity guarantee of its own, unlike the hub."""
+    import re
+
+    for f in app.MODEL_FILES:
+        if isinstance(f, weights.CivitaiFile):
+            assert re.fullmatch(r"[0-9a-f]{64}", f.sha256), f.destination
+            assert f.url.startswith("https://civitai.com/api/download/models/")
+
+
+def test_both_secrets_are_wired_for_the_two_weight_sources():
+    """Adapters now come from Civitai as well as the hub; each needs its token."""
+    assert app.HF_SECRET_NAME == "huggingface-secret"
+    assert app.CIVITAI_SECRET_NAME == "civitai-secret"

@@ -249,3 +249,24 @@ def test_every_link_still_resolves_with_a_lora():
         for name, value in node["inputs"].items():
             if isinstance(value, list):
                 assert value[0] in graph, f"{node_id}.{name} -> missing {value[0]!r}"
+
+
+def test_second_adapter_is_registered_and_downloadable():
+    spec = workflow.LORAS["realstockings-v2"]
+    assert spec.filename == "RealStockingsV2.safetensors"
+    # Trigger words are the usual reason a LoRA appears to "do nothing".
+    assert spec.trigger_words == ("stockings", "RealStockings")
+
+
+def test_each_adapter_gets_its_own_filename():
+    """Two registry entries pointing at one file would be a copy-paste slip."""
+    filenames = [spec.filename for spec in workflow.LORAS.values()]
+    assert len(filenames) == len(set(filenames))
+
+
+@pytest.mark.parametrize("lora", sorted(["snofs-v1.4", "realstockings-v2"]))
+def test_every_registered_adapter_builds_a_valid_graph(lora):
+    graph = graph_for(lora=lora)
+    node = graph[workflow.LORA_NODE_ID]
+    assert node["inputs"]["lora_name"] == workflow.LORAS[lora].filename
+    assert graph["guider"]["inputs"]["model"] == [workflow.LORA_NODE_ID, 0]

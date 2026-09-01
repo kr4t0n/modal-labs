@@ -21,7 +21,7 @@ VARIANTS = ["base", "distilled", "ponpoke-uncensored"]
 
 # "none" rather than an empty string so the dropdown reads clearly. Mirrors the
 # service's registry; /variants is the authoritative list.
-LORAS = ["none", "snofs-v1.4"]
+LORAS = ["none", "snofs-v1.4", "realstockings-v2"]
 
 
 class Flux2KleinModal:

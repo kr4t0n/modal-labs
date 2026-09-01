@@ -130,3 +130,10 @@ async def test_variants_endpoint_lists_available_loras(wired):
     body = (await client.get("/variants")).json()
     assert "snofs-v1.4" in body["loras"]
     assert body["default_lora_strength"] == workflow.DEFAULT_LORA_STRENGTH
+
+
+@pytest.mark.asyncio
+async def test_variants_endpoint_reports_trigger_words(wired):
+    _, client, _ = wired
+    body = (await client.get("/variants")).json()
+    assert body["loras"]["realstockings-v2"]["trigger_words"] == ["stockings", "RealStockings"]

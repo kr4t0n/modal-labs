@@ -98,9 +98,14 @@ export MODAL_SECRET=ws-...
 An adapter can be layered onto the transformer for any variant. Omit `lora` and
 the graph is exactly what it was before the feature existed.
 
-| Name | What it is |
-| --- | --- |
-| `snofs-v1.4` | [Ashen3 SNOFS v1.4](https://huggingface.co/Ashen3/SNOFS) — a LoKr adapter trained on klein 9B |
+| Name | Trigger words | What it is |
+| --- | --- | --- |
+| `snofs-v1.4` | — | [Ashen3 SNOFS v1.4](https://huggingface.co/Ashen3/SNOFS) — a LoKr adapter trained on klein 9B |
+| `realstockings-v2` | `stockings`, `RealStockings` | [lajmar Stockings v2](https://civitai.com/models/2463208) — a standard LoRA trained on klein 9B |
+
+**Trigger words matter.** An adapter whose trigger is absent from the prompt
+loads without error and simply is not invoked — the usual reason a LoRA appears
+to do nothing. `GET /variants` lists them per adapter.
 
 ```bash
 uv run python client.py generate "..." --lora snofs-v1.4 --lora-strength 0.8
@@ -111,8 +116,10 @@ uv run python client.py generate "..." --lora snofs-v1.4 --lora-strength 0.8
 with `ponpoke-uncensored` as readily as with `base`.
 
 Adding another means two lines — an entry in `LORAS` in `workflow.py` and a
-matching `ModelFile` in `app.py`, so the weights are on the Volume before a
-request can name them. A test asserts those two stay in step.
+matching weight file in `app.py`, so the weights are on the Volume before a
+request can name them. A test asserts those two stay in step. Adapters may come
+from Hugging Face or Civitai; Civitai ones pin a SHA256, since the CDN offers no
+integrity guarantee of its own.
 
 > **`snofs-v1.4` licence.** Ashen3 releases SNOFS under a *Model Personal Use
 > License (No Service, No Derivatives, No Redistribution)*. It permits local use

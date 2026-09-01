@@ -47,6 +47,8 @@ APP_NAME = "flux2klein-comfyui"
 # Unlike the ideogram4 service these come from four repos whose internal layouts
 # do not match ComfyUI's, so every file carries an explicit destination.
 HF_SECRET_NAME = os.environ.get("FLUX2KLEIN_HF_SECRET", "huggingface-secret")
+# Some adapters live on Civitai behind a token; the transformers do not.
+CIVITAI_SECRET_NAME = os.environ.get("FLUX2KLEIN_CIVITAI_SECRET", "civitai-secret")
 
 
 MODEL_FILES = (
@@ -88,6 +90,13 @@ MODEL_FILES = (
         "loras/klein_snofs_v1_4.safetensors",
         gated=False,
     ),
+    # Civitai rather than Hugging Face, and token-gated: it 401s anonymously.
+    weights.CivitaiFile(
+        model_version_id=2780614,  # Stockings v2, published 2026-03-17
+        file_id=2666781,
+        destination="loras/RealStockingsV2.safetensors",
+        sha256="023dfa51a970e4bb0ed132d85d48eae092e0ace630bf704da13fead0bb798aa2",
+    ),
 )
 
 REQUIRED_MODELS = weights.destinations(MODEL_FILES)
@@ -111,7 +120,10 @@ app = modal.App(APP_NAME, image=image)
 @app.function(
     volumes={MODELS_DIR: models_volume},
     timeout=7200,
-    secrets=[modal.Secret.from_name(HF_SECRET_NAME, required_keys=["HF_TOKEN"])],
+    secrets=[
+        modal.Secret.from_name(HF_SECRET_NAME, required_keys=["HF_TOKEN"]),
+        modal.Secret.from_name(CIVITAI_SECRET_NAME, required_keys=["CIVITAI_TOKEN"]),
+    ],
 )
 def download_models(force: bool = False) -> list[str]:
     """Populate the weights Volume.

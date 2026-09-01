@@ -46,6 +46,13 @@ state dict to `TEModel.QWEN3_8B`, which under `CLIPType.FLUX2` routes to
 lands on the same encoder for FLUX2, so the load works whether or not the
 donor checkpoint kept its visual tower.
 
+**Adapters may come from either source.** `weights.py` handles both, so an
+entry is a `HuggingFaceFile` or a `CivitaiFile` depending on where it lives.
+Civitai ones are token-gated and pin a digest, so `download_models` carries both
+the Hugging Face and Civitai secrets. A test asserts every `CivitaiFile` has a
+well-formed SHA256 — a Civitai entry without one is the failure worth catching,
+since nothing upstream would notice a substituted adapter.
+
 **Adapters are a registry, not a filename.** `lora` names an entry in `LORAS`
 rather than accepting an arbitrary file, because the weights must already be on
 the Volume when a request arrives — a free-form name would validate and then
