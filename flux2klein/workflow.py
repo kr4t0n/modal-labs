@@ -149,6 +149,17 @@ LORAS: dict[str, Lora] = {
         ),
         trigger_words=("stockings", "RealStockings"),
     ),
+    # No trigger words by design: upstream publishes none, so this one is a
+    # general finetune that applies to every prompt rather than a concept
+    # summoned by a token. The empty tuple here is a fact, not an omission.
+    "realism-engine-v2": Lora(
+        filename="Realism_Engine_Klein_V2.safetensors",
+        description=(
+            "Realism Engine Klein v2 — a general nudity and anatomy finetune "
+            "for klein 9B. Adult content. Upstream recommends strength "
+            "1.0-1.25, above this service's 1.0 default."
+        ),
+    ),
 }
 
 # Upstream publishes no recommended strength, so this is the conventional 1.0.

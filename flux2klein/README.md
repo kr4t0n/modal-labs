@@ -102,10 +102,17 @@ the graph is exactly what it was before the feature existed.
 | --- | --- | --- |
 | `snofs-v1.4` | — | [Ashen3 SNOFS v1.4](https://huggingface.co/Ashen3/SNOFS) — a LoKr adapter trained on klein 9B |
 | `realstockings-v2` | `stockings`, `RealStockings` | [lajmar Stockings v2](https://civitai.com/models/2463208) — a standard LoRA trained on klein 9B |
+| `realism-engine-v2` | — | [Realism Engine Klein v2](https://civitai.com/models/2374977) — a general nudity and anatomy finetune for klein 9B. Adult content |
 
 **Trigger words matter.** An adapter whose trigger is absent from the prompt
 loads without error and simply is not invoked — the usual reason a LoRA appears
 to do nothing. `GET /variants` lists them per adapter.
+
+A dash in that column means the adapter has no trigger and applies to every
+prompt — `snofs-v1.4` and `realism-engine-v2` are general finetunes rather than
+concept adapters. `realism-engine-v2` is the one adapter with a published
+strength recommendation: upstream suggests **1.0–1.25**, so `--lora-strength`
+is worth raising above this service's 1.0 default.
 
 ```bash
 uv run python client.py generate "..." --lora snofs-v1.4 --lora-strength 0.8

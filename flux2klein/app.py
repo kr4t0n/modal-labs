@@ -97,6 +97,13 @@ MODEL_FILES = (
         destination="loras/RealStockingsV2.safetensors",
         sha256="023dfa51a970e4bb0ed132d85d48eae092e0ace630bf704da13fead0bb798aa2",
     ),
+    # ~1.0 GB, the largest adapter here — roughly ten times the other two.
+    weights.CivitaiFile(
+        model_version_id=2679241,  # Realism Engine Klein v2.0, published 2026-02-11
+        file_id=2566045,
+        destination="loras/Realism_Engine_Klein_V2.safetensors",
+        sha256="97140b103cb601f83db8ecb854ee804bd4261fba056ecf7802c65359525b0a8a",
+    ),
 )
 
 REQUIRED_MODELS = weights.destinations(MODEL_FILES)

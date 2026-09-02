@@ -258,13 +258,21 @@ def test_second_adapter_is_registered_and_downloadable():
     assert spec.trigger_words == ("stockings", "RealStockings")
 
 
+def test_third_adapter_is_registered_and_downloadable():
+    spec = workflow.LORAS["realism-engine-v2"]
+    assert spec.filename == "Realism_Engine_Klein_V2.safetensors"
+    # Upstream publishes no trained words: this is a general finetune, not a
+    # concept adapter, so an empty tuple is the correct registry value.
+    assert spec.trigger_words == ()
+
+
 def test_each_adapter_gets_its_own_filename():
     """Two registry entries pointing at one file would be a copy-paste slip."""
     filenames = [spec.filename for spec in workflow.LORAS.values()]
     assert len(filenames) == len(set(filenames))
 
 
-@pytest.mark.parametrize("lora", sorted(["snofs-v1.4", "realstockings-v2"]))
+@pytest.mark.parametrize("lora", sorted(["snofs-v1.4", "realstockings-v2", "realism-engine-v2"]))
 def test_every_registered_adapter_builds_a_valid_graph(lora):
     graph = graph_for(lora=lora)
     node = graph[workflow.LORA_NODE_ID]

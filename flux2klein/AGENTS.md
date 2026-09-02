@@ -118,4 +118,10 @@ CI imports each `app.py` in a separate process for the same reason.
 - The 4B variants are not wired up. They use a different text encoder
   (`qwen_3_4b`), which the pairing comment in `workflow.py` deliberately fixes
   to the 8B one — mixing encoder and transformer scales degrades output silently.
-- No LoRA loading.
+- Only one adapter at a time. `lora` is a single name, so the graph splices at
+  most one `LoraLoaderModelOnly`; stacking would mean a chain of them and a
+  strength per link.
+- `trained_on` is advisory and currently defaults to `"base"` for every entry.
+  Civitai's taxonomy has one bucket for klein 9B and does not distinguish the
+  base transformer from the distilled one, so for Civitai-sourced adapters the
+  field records an assumption rather than a published fact.
