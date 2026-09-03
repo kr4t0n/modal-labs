@@ -209,16 +209,25 @@ class ProgressMirror:
             return comfy.utils.ProgressBar(total)
 
 
-def common_geometry_inputs() -> dict[str, Any]:
-    """The width/height/aspect-ratio/seed widgets every render node shares."""
+def common_geometry_inputs(
+    *, default_side: int = 1024, default_megapixels: float = 1.0
+) -> dict[str, Any]:
+    """The width/height/aspect-ratio/seed widgets every render node shares.
+
+    The widgets always send a value, so a model whose native resolution is not
+    1 MP needs its defaults moved here rather than left to the server.
+    """
     return {
         "aspect_ratio": (
             ASPECT_RATIOS,
             {"default": "1:1", "tooltip": "'custom' uses the width/height widgets instead."},
         ),
-        "megapixels": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 4.0, "step": 0.1}),
-        "width": ("INT", {"default": 1024, "min": 256, "max": 2048, "step": 16}),
-        "height": ("INT", {"default": 1024, "min": 256, "max": 2048, "step": 16}),
+        "megapixels": (
+            "FLOAT",
+            {"default": default_megapixels, "min": 0.1, "max": 4.0, "step": 0.1},
+        ),
+        "width": ("INT", {"default": default_side, "min": 256, "max": 2048, "step": 16}),
+        "height": ("INT", {"default": default_side, "min": 256, "max": 2048, "step": 16}),
         "batch_size": ("INT", {"default": 1, "min": 1, "max": 8}),
         "seed": (
             "INT",

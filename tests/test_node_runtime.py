@@ -67,11 +67,12 @@ def clear_recorded_bars():
 # pinned here rather than left to drift.
 
 
-def test_both_services_register_their_nodes():
+def test_every_service_registers_its_node():
     assert set(comfy_node.NODE_CLASS_MAPPINGS) == {
         "Flux2KleinModal",
         "UltraModal",
         "ZImageTurboStableYogiModal",
+        "FinePornV4Modal",
     }
     assert set(comfy_node.NODE_DISPLAY_NAME_MAPPINGS) == set(comfy_node.NODE_CLASS_MAPPINGS)
 
@@ -101,6 +102,23 @@ def test_both_services_register_their_nodes():
         ),
         (
             "UltraModal",
+            [
+                "prompt",
+                "negative_prompt",
+                "aspect_ratio",
+                "megapixels",
+                "width",
+                "height",
+                "batch_size",
+                "seed",
+                "steps",
+                "cfg",
+                "sampler_name",
+                "scheduler",
+            ],
+        ),
+        (
+            "FinePornV4Modal",
             [
                 "prompt",
                 "negative_prompt",
@@ -148,6 +166,7 @@ def test_nodes_return_an_image_seed_and_info():
         "Flux2KleinModal",
         "UltraModal",
         "ZImageTurboStableYogiModal",
+        "FinePornV4Modal",
     ):
         node = comfy_node.NODE_CLASS_MAPPINGS[node_id]
         assert node.RETURN_TYPES == ("IMAGE", "INT", "STRING")
@@ -374,3 +393,37 @@ def test_node_variant_names_match_the_service_registry():
     with service_workflow("flux2klein") as workflow:
         registered = sorted(workflow.VARIANTS)
     assert sorted(comfy_node.nodes_flux2klein.VARIANTS) == registered
+
+
+def test_finepornv4_node_mirrors_the_services_resolution_defaults():
+    """This service renders above 1 MP, and the widgets always send a value.
+
+    A node left at the shared 1024/1.0 defaults would override the server on
+    every call, quietly undoing the one thing this deployment tunes.
+    """
+    with service_workflow("finepornv4") as workflow:
+        assert comfy_node.nodes_finepornv4.DEFAULT_SIDE == workflow.DEFAULT_SIDE
+        assert comfy_node.nodes_finepornv4.DEFAULT_MEGAPIXELS == workflow.DEFAULT_MEGAPIXELS
+        expected_sampler = workflow.DEFAULT_SAMPLER
+        expected_scheduler = workflow.DEFAULT_SCHEDULER
+        expected_steps = workflow.DEFAULT_STEPS
+
+    widgets = comfy_node.NODE_CLASS_MAPPINGS["FinePornV4Modal"].INPUT_TYPES()["required"]
+    assert widgets["width"][1]["default"] == comfy_node.nodes_finepornv4.DEFAULT_SIDE
+    assert widgets["height"][1]["default"] == comfy_node.nodes_finepornv4.DEFAULT_SIDE
+    assert widgets["megapixels"][1]["default"] == comfy_node.nodes_finepornv4.DEFAULT_MEGAPIXELS
+    assert widgets["steps"][1]["default"] == expected_steps
+    # The dropdowns must *offer* the recipe pairing and default to it.
+    assert widgets["sampler_name"][1]["default"] == expected_sampler
+    assert widgets["scheduler"][1]["default"] == expected_scheduler
+    assert expected_sampler in widgets["sampler_name"][0]
+    assert expected_scheduler in widgets["scheduler"][0]
+
+
+def test_shared_geometry_defaults_are_unchanged_for_other_nodes():
+    """The override is keyword-only; every other node keeps 1024/1.0."""
+    for node_id in ("Flux2KleinModal", "UltraModal", "ZImageTurboStableYogiModal"):
+        widgets = comfy_node.NODE_CLASS_MAPPINGS[node_id].INPUT_TYPES()["required"]
+        assert widgets["width"][1]["default"] == 1024
+        assert widgets["height"][1]["default"] == 1024
+        assert widgets["megapixels"][1]["default"] == 1.0

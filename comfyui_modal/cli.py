@@ -99,11 +99,23 @@ def cmd_validate(url: str, graph: dict[str, Any]) -> None:
     print(f"OK — all {len(graph)} nodes match the deployed ComfyUI schemas")
 
 
-def add_geometry_arguments(parser: argparse.ArgumentParser, aspect_ratios) -> None:
+def add_geometry_arguments(
+    parser: argparse.ArgumentParser,
+    aspect_ratios,
+    *,
+    default_side: int = 1024,
+    default_megapixels: float = 1.0,
+) -> None:
+    """The width/height/ratio/seed flags every client shares.
+
+    `geometry_payload` always sends width and height, so a service whose model
+    wants a different native resolution has to move these defaults rather than
+    rely on the server's — otherwise the CLI overrides it on every call.
+    """
     parser.add_argument("--aspect-ratio", choices=sorted(aspect_ratios))
-    parser.add_argument("--megapixels", type=float, default=1.0)
-    parser.add_argument("--width", type=int, default=1024)
-    parser.add_argument("--height", type=int, default=1024)
+    parser.add_argument("--megapixels", type=float, default=default_megapixels)
+    parser.add_argument("--width", type=int, default=default_side)
+    parser.add_argument("--height", type=int, default=default_side)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--timeout", type=float, default=900.0)

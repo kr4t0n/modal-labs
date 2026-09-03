@@ -10,6 +10,7 @@ management — it runs unchanged on a CPU-only install.
 | **FLUX.2 klein (Modal)** | FLUX.2 klein (Modal) |
 | **ULTRA / Krea 2 (Modal)** | ULTRA / Krea 2 (Modal) |
 | **Z-Image Turbo Stable Yogi (Modal)** | Z-Image Turbo Stable Yogi (Modal) |
+| **FinePorn v4 / Krea 2 (Modal)** | FinePorn v4 / Krea 2 (Modal) |
 
 Nodes whose endpoint is unconfigured simply raise a clear error when run, so
 installing the package without deploying every service is fine.
@@ -117,13 +118,27 @@ drives `ModelSamplingAuraFlow`; leave it at 3.0 unless you know why you are
 changing it — the underlying node's own default of 1.73 gives a different noise
 schedule. As with ULTRA, the negative prompt is inert at cfg 1.
 
+**FinePorn v4 / Krea 2 (Modal)** → `IMAGE`, `INT` (seed), `STRING` (info)
+
+The same Krea 2 base as ULTRA, a different merge. Defaults to `euler` + `beta`
+at 10 steps, cfg 1 — the pairing its model card names for v4, not the `simple`
+scheduler ULTRA takes from ComfyUI's template. The negative prompt is inert at
+cfg 1, as there.
+
+Two widgets differ from every other node here. `width` and `height` default to
+**1280**, not 1024, because the card reports standard Krea 2 resolutions
+underperform on this merge; dropping them back to 1024 is a quality regression
+with no error to notice. And its prompt wants a smartphone-snapshot opener —
+"this is a casual, low-quality photo" or similar — which the node's default
+prompt demonstrates and the tooltip explains.
+
 For all render nodes, set `aspect_ratio` to `custom` to use the width/height
 widgets, and use the optional `endpoint` widget to override the environment if
 you run more than one deployment of a service.
 
 ## Progress
 
-Both render nodes report the remote sampler's progress on their own local
+Every render node reports the remote sampler's progress on its own local
 progress bar. The node sends a client id with the request and subscribes to the
 deployment's websocket with the same id, so ComfyUI's per-step progress events
 come back and drive `comfy.utils.ProgressBar`.
