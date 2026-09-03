@@ -12,9 +12,12 @@ exceptions by design: if it silently stopped working, nothing would say so.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import importlib
 import sys
 import time
 import types
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
@@ -93,6 +96,7 @@ def test_both_services_register_their_nodes():
                 "cfg",
                 "lora",
                 "lora_strength",
+                "override_lora_strength",
             ],
         ),
         (
@@ -322,3 +326,51 @@ def test_progress_bar_without_node_id_support():
 
     assert created == [8]
     assert bar.updates == [(3, 8)]
+
+
+# --- Registry mirrors -------------------------------------------------------
+# The node hardcodes its variant and adapter names. It has to: it runs inside
+# the user's ComfyUI, where the deployment's `workflow` module does not exist,
+# and ComfyUI calls INPUT_TYPES() during startup, so fetching /variants there
+# would block the boot and fail whenever the endpoint is down. That makes the
+# lists a hand-maintained mirror, and drift is silent until a render fails with
+# `unknown lora`. These tests are the thing that notices.
+
+
+@contextlib.contextmanager
+def service_workflow(service: str):
+    """Import one service's `workflow` module, then put `sys.modules` back.
+
+    Every service ships a top-level `workflow`, `server` and `app`, and pytest
+    collects them all in one interpreter, so borrowing the name has to be undone
+    or the next suite silently tests this one's graph. See flux2klein/AGENTS.md.
+    """
+    directory = str(Path(__file__).resolve().parents[1] / service)
+    saved = {name: sys.modules.pop(name, None) for name in ("workflow", "server", "app")}
+    sys.path.insert(0, directory)
+    try:
+        yield importlib.import_module("workflow")
+    finally:
+        sys.path.remove(directory)
+        sys.modules.pop("workflow", None)
+        for name, module in saved.items():
+            if module is not None:
+                sys.modules[name] = module
+
+
+def test_node_adapter_names_match_the_service_registry():
+    offered = comfy_node.nodes_flux2klein.LORAS
+    with service_workflow("flux2klein") as workflow:
+        registered = sorted(workflow.LORAS)
+
+    # "none" is the node's own affordance, not a registry entry: the widget
+    # needs an explicit way to say "no adapter".
+    assert offered[0] == "none"
+    assert sorted(offered[1:]) == registered
+    assert len(set(offered)) == len(offered)
+
+
+def test_node_variant_names_match_the_service_registry():
+    with service_workflow("flux2klein") as workflow:
+        registered = sorted(workflow.VARIANTS)
+    assert sorted(comfy_node.nodes_flux2klein.VARIANTS) == registered

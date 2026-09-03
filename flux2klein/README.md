@@ -103,6 +103,8 @@ the graph is exactly what it was before the feature existed.
 | `snofs-v1.4` | — | [Ashen3 SNOFS v1.4](https://huggingface.co/Ashen3/SNOFS) — a LoKr adapter trained on klein 9B |
 | `realstockings-v2` | `stockings`, `RealStockings` | [lajmar Stockings v2](https://civitai.com/models/2463208) — a standard LoRA trained on klein 9B |
 | `realism-engine-v2` | — | [Realism Engine Klein v2](https://civitai.com/models/2374977) — a general nudity and anatomy finetune for klein 9B. Adult content |
+| `nsfw-unlocked-v2` | `nude`, `naked`, `blow job`, `cum`, `ass`, `pussy` | [NSFW Unlocked v2](https://civitai.com/models/2063193?modelVersionId=3030169) — an explicit-content LoRA. Adult content |
+| `naturalbeauty-v2` | `naked`, `topless`, `bottomless` | [NaturalBeauty v2](https://civitai.com/models/2532692?modelVersionId=2972296) — photorealistic female nudity. Adult content |
 
 **Trigger words matter.** An adapter whose trigger is absent from the prompt
 loads without error and simply is not invoked — the usual reason a LoRA appears
@@ -110,9 +112,30 @@ to do nothing. `GET /variants` lists them per adapter.
 
 A dash in that column means the adapter has no trigger and applies to every
 prompt — `snofs-v1.4` and `realism-engine-v2` are general finetunes rather than
-concept adapters. `realism-engine-v2` is the one adapter with a published
-strength recommendation: upstream suggests **1.0–1.25**, so `--lora-strength`
-is worth raising above this service's 1.0 default.
+concept adapters.
+
+**Strength defaults per adapter.** Where an author publishes a recommended
+band, the registry carries it and the server applies its midpoint when a request
+omits `lora_strength`:
+
+| Adapter | Published band | Applied by default |
+| --- | --- | --- |
+| `nsfw-unlocked-v2` | 0.5–0.9 | 0.7 |
+| `realism-engine-v2` | 1.0–1.25 | 1.125 |
+| everything else | — | 1.0 |
+
+An explicit `lora_strength` always wins, including an explicit `1.0`. Omitting it
+is what opts into the recommendation, so `--lora-strength` has no default at the
+CLI. `GET /variants` reports both `recommended_strength` and the
+`default_strength` that would be applied.
+
+`nsfw-unlocked-v2` also suggests 20+ steps at cfg 3.5, so it pairs with `base`
+rather than the 4-step `distilled` variant.
+
+**Both of the last two ship builds for other architectures** under the same
+Civitai model — Flux.1 D and Z-Image for one, Krea 2 for the other. The pinned
+`model_version_id` in `app.py` is what selects the klein build, so it is not a
+detail to update casually.
 
 ```bash
 uv run python client.py generate "..." --lora snofs-v1.4 --lora-strength 0.8
@@ -179,7 +202,7 @@ uv run modal run app.py --prompt "a brutalist library at golden hour" --variant 
 | `negative_prompt` | `""` | Base variant only |
 | `variant` | `base` | `base`, `distilled` or `ponpoke-uncensored` |
 | `lora` | — | Adapter name from `/variants`; omit for none |
-| `lora_strength` | 1.0 | Ignored when no `lora` is named |
+| `lora_strength` | the adapter's own | Omit to use its recommended strength; ignored when no `lora` is named |
 | `width`, `height` | 1024 | 256–2048, snapped to /16 |
 | `aspect_ratio` | — | `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `9:16`, `16:9`, `21:9`; overrides width/height |
 | `megapixels` | 1.0 | Pixel budget used with `aspect_ratio` |

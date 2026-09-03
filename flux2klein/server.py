@@ -41,11 +41,14 @@ class GenerateRequest(BaseGenerateRequest):
             "omit for the plain variant."
         ),
     )
-    lora_strength: float = Field(
-        default=workflow.DEFAULT_LORA_STRENGTH,
+    lora_strength: float | None = Field(
+        default=None,
         ge=-10.0,
         le=10.0,
-        description="Ignored when no lora is named.",
+        description=(
+            "Omit to use the adapter's own recommended strength, which /variants "
+            "reports per adapter. Ignored when no lora is named."
+        ),
     )
 
     steps: int | None = Field(default=None, ge=1, le=200, description="Overrides the variant.")
@@ -103,6 +106,12 @@ def _register_extra_routes(web_app: FastAPI) -> None:
                     "description": spec.description,
                     "trained_on": spec.trained_on,
                     "trigger_words": list(spec.trigger_words),
+                    # The published band, and the single value applied when the
+                    # request omits lora_strength.
+                    "recommended_strength": (
+                        list(spec.recommended_strength) if spec.recommended_strength else None
+                    ),
+                    "default_strength": spec.default_strength,
                 }
                 for name, spec in workflow.LORAS.items()
             },

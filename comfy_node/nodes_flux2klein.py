@@ -21,7 +21,14 @@ VARIANTS = ["base", "distilled", "ponpoke-uncensored"]
 
 # "none" rather than an empty string so the dropdown reads clearly. Mirrors the
 # service's registry; /variants is the authoritative list.
-LORAS = ["none", "snofs-v1.4", "realstockings-v2", "realism-engine-v2"]
+LORAS = [
+    "none",
+    "snofs-v1.4",
+    "realstockings-v2",
+    "realism-engine-v2",
+    "nsfw-unlocked-v2",
+    "naturalbeauty-v2",
+]
 
 
 class Flux2KleinModal:
@@ -71,6 +78,20 @@ class Flux2KleinModal:
                     "FLOAT",
                     {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.05},
                 ),
+                # Appended after the value it governs, which reads oddly beside
+                # `override_sampler`, but position is the widget contract: the
+                # natural spot before `lora_strength` would shift every saved
+                # workflow's values by one.
+                "override_lora_strength": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                        "tooltip": (
+                            "Off means the adapter's own recommended strength "
+                            "is used; see /variants."
+                        ),
+                    },
+                ),
             },
             "optional": endpoint_inputs(ENV_URL),
             # Lets the progress bar attach to this node rather than the graph.
@@ -99,6 +120,7 @@ class Flux2KleinModal:
         cfg: float,
         lora: str = "none",
         lora_strength: float = 1.0,
+        override_lora_strength: bool = False,
         endpoint: str = "",
         timeout_s: float = 900.0,
         unique_id: str | None = None,
@@ -123,7 +145,10 @@ class Flux2KleinModal:
             payload["cfg"] = cfg
         if lora != "none":
             payload["lora"] = lora
-            payload["lora_strength"] = lora_strength
+            # Left out, the server applies the adapter's recommended strength,
+            # the same way omitting steps/cfg defers to the variant.
+            if override_lora_strength:
+                payload["lora_strength"] = lora_strength
 
         with ProgressMirror(url, client_id, unique_id):
             result = post(url, "/generate", payload, timeout_s)

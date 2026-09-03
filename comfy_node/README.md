@@ -82,6 +82,17 @@ Adapters are model-only, so they compose with any variant including
 `ponpoke-uncensored`. The dropdown mirrors the deployment's registry; `GET
 /variants` is authoritative if they diverge.
 
+Leave `override_lora_strength` off and the server applies whatever strength the
+adapter's author recommends, the same way `override_sampler` defers to the
+variant. That matters because the recommendations run in both directions — one
+adapter wants 0.5–0.9, another 1.0–1.25 — so the `lora_strength` widget's 1.0 is
+not a safe universal default. Turn the toggle on to send the widget value
+verbatim.
+
+> Workflows saved before this toggle existed load with it **off**, so they now
+> use the recommended strength rather than the 1.0 they used to send. Turn it on
+> to restore the old behaviour exactly.
+
 **WAI-illustrious (Modal)** → `IMAGE`, `INT` (seed), `STRING` (info)
 
 Danbooru tags rather than prose: `1girl, solo, silver hair, masterpiece`. Full

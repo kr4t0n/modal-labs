@@ -118,6 +118,12 @@ VARIANTS: dict[str, Variant] = {
 DEFAULT_VARIANT = "base"
 
 
+# The fallback for adapters whose author publishes no guidance; the
+# conventional full-strength value. Adapters that *do* publish a range carry it
+# on the registry entry and are resolved per-adapter, not from this.
+DEFAULT_LORA_STRENGTH = 1.0
+
+
 @dataclass(frozen=True)
 class Lora:
     """An adapter that can be layered onto the klein transformer."""
@@ -131,6 +137,25 @@ class Lora:
     # is the usual reason a LoRA "does nothing" — it loads fine and simply is
     # not invoked, so the registry carries them where callers can see them.
     trigger_words: tuple[str, ...] = ()
+    # The strength range the author publishes, when they publish one. Stored as
+    # the range rather than a single number because that is what model cards
+    # actually say, and the spread is information a caller may want to explore.
+    recommended_strength: tuple[float, float] | None = None
+
+    @property
+    def default_strength(self) -> float:
+        """The strength to apply when the caller names none.
+
+        The midpoint of the published range. Not the low end: these ranges are
+        the author's working band rather than a safety limit, so the middle is
+        the least surprising pick. Adapters with no published range fall back to
+        the service default, which is what every adapter used before this field
+        existed.
+        """
+        if self.recommended_strength is None:
+            return DEFAULT_LORA_STRENGTH
+        low, high = self.recommended_strength
+        return round((low + high) / 2, 3)
 
 
 # A registry rather than a free-form filename: the weights have to be fetched
@@ -157,13 +182,37 @@ LORAS: dict[str, Lora] = {
         description=(
             "Realism Engine Klein v2 — a general nudity and anatomy finetune "
             "for klein 9B. Adult content. Upstream recommends strength "
-            "1.0-1.25, above this service's 1.0 default."
+            "1.0-1.25, above this service's 1.0 fallback."
         ),
+        recommended_strength=(1.0, 1.25),
+    ),
+    # Upstream's prose and its machine-readable trained-words list disagree:
+    # the model card also names "big round boobs" and "topless". The API list
+    # is what is pinned here, being the field Civitai actually maintains.
+    "nsfw-unlocked-v2": Lora(
+        filename="FLUX2_KLEIN_UNLOCKED_V2.safetensors",
+        description=(
+            "NSFW Unlocked v2, klein build — an explicit-content LoRA trained "
+            "on klein 9B. Adult content. Upstream recommends strength 0.5-0.9, "
+            "*below* this service's 1.0 fallback, plus 20+ steps at cfg 3.5."
+        ),
+        trigger_words=("nude", "naked", "blow job", "cum", "ass", "pussy"),
+        recommended_strength=(0.5, 0.9),
+    ),
+    # Civitai's trained-words list is empty for this one, but the model card
+    # documents the triggers in prose. Trusting the empty field would register
+    # an adapter that loads and silently does nothing, so the prose wins.
+    "naturalbeauty-v2": Lora(
+        filename="NaturalBeautyFLUX2Klein9BNudity_v2.safetensors",
+        description=(
+            "NaturalBeauty v2, klein build — a photorealistic female-nudity "
+            "LoRA trained on klein 9B. Adult content. Responds to further "
+            "tags for pose, hair, body direction and pubic hair; see the "
+            "model card."
+        ),
+        trigger_words=("naked", "topless", "bottomless"),
     ),
 }
-
-# Upstream publishes no recommended strength, so this is the conventional 1.0.
-DEFAULT_LORA_STRENGTH = 1.0
 
 
 @dataclass(frozen=True)
@@ -196,7 +245,9 @@ def resolve_params(
     negative_prompt: str = "",
     variant: str = DEFAULT_VARIANT,
     lora: str | None = None,
-    lora_strength: float = DEFAULT_LORA_STRENGTH,
+    # None means "no opinion", which is what lets the adapter's own recommended
+    # strength apply. An explicit float always wins, including an explicit 1.0.
+    lora_strength: float | None = None,
     width: int = 1024,
     height: int = 1024,
     seed: int | None = None,
@@ -221,6 +272,16 @@ def resolve_params(
     if resolved_steps < 1:
         raise WorkflowError("steps must be at least 1")
 
+    # Resolved from the adapter rather than a global constant: two of these
+    # publish a strength band, and one of them sits below the old 1.0 default,
+    # so taking the constant would have overdriven it.
+    if lora_strength is not None:
+        resolved_strength = float(lora_strength)
+    elif lora is not None:
+        resolved_strength = LORAS[lora].default_strength
+    else:
+        resolved_strength = DEFAULT_LORA_STRENGTH
+
     return GenerationParams(
         prompt=prompt,
         negative_prompt=negative_prompt,
@@ -228,7 +289,7 @@ def resolve_params(
         checkpoint=spec.checkpoint,
         text_encoder=spec.text_encoder,
         lora=lora,
-        lora_strength=float(lora_strength),
+        lora_strength=resolved_strength,
         width=snap_side(width),
         height=snap_side(height),
         seed=normalise_seed(seed),

@@ -104,6 +104,22 @@ MODEL_FILES = (
         destination="loras/Realism_Engine_Klein_V2.safetensors",
         sha256="97140b103cb601f83db8ecb854ee804bd4261fba056ecf7802c65359525b0a8a",
     ),
+    # The version id carries more weight here than usual: this model also ships
+    # Flux.1 D and Z-Image builds, so the wrong one would be an adapter for a
+    # different architecture entirely rather than a merely worse klein result.
+    weights.CivitaiFile(
+        model_version_id=3030169,  # NSFW Unlocked FLUX2_KLEIN_V2, published 2026-06-13
+        file_id=2908972,
+        destination="loras/FLUX2_KLEIN_UNLOCKED_V2.safetensors",
+        sha256="9a38cb177bdd829ebfe6953916f29ed7d9db249c967b7542d8f03050c9cf7592",
+    ),
+    # Likewise: the sibling version of this one targets Krea 2, not klein.
+    weights.CivitaiFile(
+        model_version_id=2972296,  # NaturalBeauty Flux2[k]9B v2, published 2026-05-24
+        file_id=2851866,
+        destination="loras/NaturalBeautyFLUX2Klein9BNudity_v2.safetensors",
+        sha256="bc456c7b162710c3989d2dd33c7d2f0a25dab50b41f6692b50726deb5268e9ec",
+    ),
 )
 
 REQUIRED_MODELS = weights.destinations(MODEL_FILES)

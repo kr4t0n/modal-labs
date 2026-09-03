@@ -239,8 +239,39 @@ def test_unknown_lora_rejected():
 
 
 def test_default_lora_strength_applied():
+    """An adapter with no published range still gets the service default."""
     params = workflow.resolve_params("x", lora="snofs-v1.4")
+    assert workflow.LORAS["snofs-v1.4"].recommended_strength is None
     assert params.lora_strength == workflow.DEFAULT_LORA_STRENGTH
+
+
+@pytest.mark.parametrize(
+    ("lora", "expected"),
+    [("nsfw-unlocked-v2", 0.7), ("realism-engine-v2", 1.125), ("snofs-v1.4", 1.0)],
+)
+def test_omitted_strength_resolves_from_the_adapter(lora, expected):
+    """The point of the field: 1.0 overdrives an adapter whose band is 0.5-0.9."""
+    assert workflow.resolve_params("x", lora=lora).lora_strength == expected
+
+
+@pytest.mark.parametrize("explicit", [0.0, 0.35, 1.0, 2.0])
+def test_explicit_strength_always_wins(explicit):
+    """Including an explicit 1.0, and including a falsy 0.0.
+
+    `None` is the only "no opinion" value; testing 0.0 pins that the resolver
+    checks for None rather than truthiness.
+    """
+    params = workflow.resolve_params("x", lora="nsfw-unlocked-v2", lora_strength=explicit)
+    assert params.lora_strength == explicit
+
+
+def test_published_strength_ranges_are_well_formed():
+    for name, spec in workflow.LORAS.items():
+        if spec.recommended_strength is None:
+            continue
+        low, high = spec.recommended_strength
+        assert 0.0 < low <= high, name
+        assert low <= spec.default_strength <= high, name
 
 
 def test_every_link_still_resolves_with_a_lora():
@@ -266,13 +297,42 @@ def test_third_adapter_is_registered_and_downloadable():
     assert spec.trigger_words == ()
 
 
+@pytest.mark.parametrize(
+    ("name", "filename", "triggers"),
+    [
+        (
+            "nsfw-unlocked-v2",
+            "FLUX2_KLEIN_UNLOCKED_V2.safetensors",
+            ("nude", "naked", "blow job", "cum", "ass", "pussy"),
+        ),
+        (
+            "naturalbeauty-v2",
+            "NaturalBeautyFLUX2Klein9BNudity_v2.safetensors",
+            ("naked", "topless", "bottomless"),
+        ),
+    ],
+)
+def test_multi_architecture_adapters_pin_their_klein_build(name, filename, triggers):
+    """Both upstreams publish builds for other architectures under one model.
+
+    The filename is what proves the klein build was the one registered. The
+    triggers matter twice over for NaturalBeauty, whose machine-readable list
+    is empty upstream while its model card documents them in prose.
+    """
+    spec = workflow.LORAS[name]
+    assert spec.filename == filename
+    assert spec.trigger_words == triggers
+
+
 def test_each_adapter_gets_its_own_filename():
     """Two registry entries pointing at one file would be a copy-paste slip."""
     filenames = [spec.filename for spec in workflow.LORAS.values()]
     assert len(filenames) == len(set(filenames))
 
 
-@pytest.mark.parametrize("lora", sorted(["snofs-v1.4", "realstockings-v2", "realism-engine-v2"]))
+# Derived from the registry rather than hardcoded: the literal list this
+# replaces went stale twice, once per adapter added.
+@pytest.mark.parametrize("lora", sorted(workflow.LORAS))
 def test_every_registered_adapter_builds_a_valid_graph(lora):
     graph = graph_for(lora=lora)
     node = graph[workflow.LORA_NODE_ID]

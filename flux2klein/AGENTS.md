@@ -125,3 +125,55 @@ CI imports each `app.py` in a separate process for the same reason.
   Civitai's taxonomy has one bucket for klein 9B and does not distinguish the
   base transformer from the distilled one, so for Civitai-sourced adapters the
   field records an assumption rather than a published fact.
+- Only one strength per adapter, applied to the whole transformer. Block-level
+  or per-layer weighting would need a different loader node.
+
+## Strength is resolved per adapter, not from a constant
+
+`DEFAULT_LORA_STRENGTH` is a fallback, not the default. Where an author
+publishes a band, `Lora.recommended_strength` carries it and
+`Lora.default_strength` returns its midpoint; `resolve_params` uses that
+whenever the request omits `lora_strength`.
+
+The reason it is not a single constant: `nsfw-unlocked-v2` recommends 0.5-0.9,
+*below* the old 1.0 default, so every caller taking the default was overdriving
+it. Ranges are stored rather than one number because that is what model cards
+say, and the spread is worth showing callers.
+
+`None` is the only value meaning "no opinion" — an explicit `0.0` is a real
+request, so the resolver tests `is not None` rather than truthiness, and a test
+pins that. Correspondingly `lora_strength` is `float | None` all the way out
+through the request model and the CLI flag, and the ComfyUI node grew an
+`override_lora_strength` toggle rather than always sending its widget value.
+
+**This changed behaviour for saved workflows.** A workflow saved before the
+toggle existed loads with `override_lora_strength` at its `False` default, so it
+now sends no strength and gets the adapter's recommendation instead of the 1.0
+it used to send. That only moves the two adapters with published bands, and it
+moves them toward what their authors intend, but it is a silent change on load.
+
+## Mirrors of this registry
+
+The ComfyUI node hardcodes both the variant and adapter name lists, because it
+runs inside the user's ComfyUI where `workflow` does not exist, and because
+ComfyUI calls `INPUT_TYPES()` during startup — fetching `/variants` there would
+block the boot and fail whenever the endpoint is down.
+
+`../tests/test_node_runtime.py` compares both lists against this registry. It
+borrows the `workflow` module name through a context manager that restores
+`sys.modules` afterwards, since every service ships one and pytest collects them
+all in a single interpreter.
+
+Without those tests, drift surfaced only at render time: the dropdown offers a
+name, the server answers `unknown lora`.
+
+## Civitai gotcha: trained words are not reliable
+
+`trainedWords` from the Civitai API is empty for `naturalbeauty-v2`, whose model
+card documents `naked` / `topless` / `bottomless` in prose, and disagrees with
+the prose for `nsfw-unlocked-v2`. The registry follows whichever source is
+actually correct, per-entry, with a comment saying which and why.
+
+This matters more than it looks: an adapter registered with no triggers when it
+has them loads cleanly, renders, and quietly does nothing — there is no error to
+notice. Read the model card, not just the API response.
