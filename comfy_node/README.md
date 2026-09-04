@@ -12,6 +12,7 @@ management — it runs unchanged on a CPU-only install.
 | **Z-Image Turbo Stable Yogi (Modal)** | Z-Image Turbo Stable Yogi (Modal) |
 | **FinePorn v4 / Krea 2 (Modal)** | FinePorn v4 / Krea 2 (Modal) |
 | **RedGPT2 GPT / Krea 2 (Modal)** | RedGPT2 / Krea 2 (Modal) |
+| **RedCraft v3 / Krea 2 (Modal)** | RedCraft v3 / Krea 2 (Modal) |
 
 Nodes whose endpoint is unconfigured simply raise a clear error when run, so
 installing the package without deploying every service is fine.
@@ -166,6 +167,18 @@ Negative prompt is inert at cfg 1, as with the other two.
 This is the single-model edition. The Civitai listing is titled "Alternating
 Evaluation" and a different version there uses two checkpoints sampled
 alternately; that build would need its own node and endpoint.
+
+**RedCraft v3 / Krea 2 (Modal)** → `IMAGE`, `INT` (seed), `STRING` (info)
+
+The fourth Krea 2 finetune here, and the only one whose author publishes a
+recipe: `euler` + `simple` at 10 steps, cfg 1, from version notes reading
+"ER_SDE / Euler | Simple | CFG =1 | 8-12 Steps". The dropdown offers `er_sde`
+too — the card treats the two as interchangeable — but `euler` is the default
+because `er_sde` is absent from some ComfyUI builds and a default that fails to
+resolve would break every render.
+
+Do not sync its settings with RedGPT2's: that edition publishes none and falls
+back to a template. `GET /defaults` on each says which it is.
 
 For all render nodes, set `aspect_ratio` to `custom` to use the width/height
 widgets, and use the optional `endpoint` widget to override the environment if
