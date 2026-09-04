@@ -11,6 +11,7 @@ management — it runs unchanged on a CPU-only install.
 | **ULTRA / Krea 2 (Modal)** | ULTRA / Krea 2 (Modal) |
 | **Z-Image Turbo Stable Yogi (Modal)** | Z-Image Turbo Stable Yogi (Modal) |
 | **FinePorn v4 / Krea 2 (Modal)** | FinePorn v4 / Krea 2 (Modal) |
+| **RedGPT2 GPT / Krea 2 (Modal)** | RedGPT2 / Krea 2 (Modal) |
 
 Nodes whose endpoint is unconfigured simply raise a clear error when run, so
 installing the package without deploying every service is fine.
@@ -131,6 +132,18 @@ underperform on this merge; dropping them back to 1024 is a quality regression
 with no error to notice. And its prompt wants a smartphone-snapshot opener —
 "this is a casual, low-quality photo" or similar — which the node's default
 prompt demonstrates and the tooltip explains.
+
+**RedGPT2 GPT / Krea 2 (Modal)** → `IMAGE`, `INT` (seed), `STRING` (info)
+
+The third Krea 2 finetune here, and the lightest. Defaults to the same turbo
+template settings as ULTRA — `euler` + `simple`, 8 steps, cfg 1 — because its
+upstream publishes no sampler recipe. Deliberately *not* FinePorn's
+`euler`/`beta`: that pairing is its author's recommendation, not a Krea 2 one.
+Negative prompt is inert at cfg 1, as with the other two.
+
+This is the single-model edition. The Civitai listing is titled "Alternating
+Evaluation" and a different version there uses two checkpoints sampled
+alternately; that build would need its own node and endpoint.
 
 For all render nodes, set `aspect_ratio` to `custom` to use the width/height
 widgets, and use the optional `endpoint` widget to override the environment if

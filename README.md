@@ -13,17 +13,23 @@ environment and tooling.
 | [`ultra/`](ultra/) | ULTRA, a Krea 2 finetune fetched from Civitai with a verified digest — 8-step turbo sampling |
 | [`zimageturbostableyogi/`](zimageturbostableyogi/) | Stable Yogi's Z-Image Turbo finetune — the cheapest of the set, a 6 GB fp8 model on a 24 GB L4 |
 | [`finepornv4/`](finepornv4/) | FinePorn v4, a Krea 2 merge — bf16, the heaviest of the set, and the only one rendering above 1 MP by default |
+| [`redgpt2gpt/`](redgpt2gpt/) | RedGPT2, GPT edition — a Krea 2 finetune, fp8, the lightest of the three Krea 2 services |
 
 Each exposes one URL that is simultaneously a real ComfyUI server and a typed
 `/generate` contract, so a CPU-only ComfyUI can stay the UI while the GPU work
 happens on Modal.
 
-`ultra/` and `finepornv4/` serve the same Krea 2 base with different merges, and
-share their text encoder and VAE — a test asserts those stay identical.
+**Three of them serve Krea 2** — `ultra/`, `finepornv4/` and `redgpt2gpt/` —
+with different finetunes over the same base, sharing a text encoder and VAE. A
+test asserts those companions stay identical across all three; divergence would
+change output without failing. All three also inherit the Krea 2 Community
+License, whose free commercial use is capped by company revenue.
 
-`finepornv4/` is the one project versioned in its own name: a later FinePorn
-release gets a sibling directory and its own endpoint rather than replacing this
-one, so the two can be compared and existing workflows keep their URL.
+Two projects carry a version or edition in their name — `finepornv4/` and
+`redgpt2gpt/`. Their upstreams publish several incompatible builds under one
+listing, so a later release gets a sibling directory and its own endpoint rather
+than replacing what is deployed, letting the two be compared while existing
+workflows keep their URL.
 
 Retired services live in [`deprecated/`](deprecated/) — kept as reference, not
 built or tested. See its README before reviving one.

@@ -73,6 +73,7 @@ def test_every_service_registers_its_node():
         "UltraModal",
         "ZImageTurboStableYogiModal",
         "FinePornV4Modal",
+        "RedGPT2GPTModal",
     }
     assert set(comfy_node.NODE_DISPLAY_NAME_MAPPINGS) == set(comfy_node.NODE_CLASS_MAPPINGS)
 
@@ -135,6 +136,23 @@ def test_every_service_registers_its_node():
             ],
         ),
         (
+            "RedGPT2GPTModal",
+            [
+                "prompt",
+                "negative_prompt",
+                "aspect_ratio",
+                "megapixels",
+                "width",
+                "height",
+                "batch_size",
+                "seed",
+                "steps",
+                "cfg",
+                "sampler_name",
+                "scheduler",
+            ],
+        ),
+        (
             "ZImageTurboStableYogiModal",
             [
                 "prompt",
@@ -167,6 +185,7 @@ def test_nodes_return_an_image_seed_and_info():
         "UltraModal",
         "ZImageTurboStableYogiModal",
         "FinePornV4Modal",
+        "RedGPT2GPTModal",
     ):
         node = comfy_node.NODE_CLASS_MAPPINGS[node_id]
         assert node.RETURN_TYPES == ("IMAGE", "INT", "STRING")
@@ -422,7 +441,12 @@ def test_finepornv4_node_mirrors_the_services_resolution_defaults():
 
 def test_shared_geometry_defaults_are_unchanged_for_other_nodes():
     """The override is keyword-only; every other node keeps 1024/1.0."""
-    for node_id in ("Flux2KleinModal", "UltraModal", "ZImageTurboStableYogiModal"):
+    for node_id in (
+        "Flux2KleinModal",
+        "UltraModal",
+        "ZImageTurboStableYogiModal",
+        "RedGPT2GPTModal",
+    ):
         widgets = comfy_node.NODE_CLASS_MAPPINGS[node_id].INPUT_TYPES()["required"]
         assert widgets["width"][1]["default"] == 1024
         assert widgets["height"][1]["default"] == 1024

@@ -32,6 +32,6 @@ jobs:
         # Catches decorator/signature mistakes without needing Modal credentials.
         # Separate processes: both services define a module named `app`.
         run: |
-          for project in flux2klein ultra zimageturbostableyogi finepornv4; do
+          for project in flux2klein ultra zimageturbostableyogi finepornv4 redgpt2gpt; do
             uv run python -c "import sys; sys.path.insert(0, '$project'); import app; print('$project ->', app.app.name)"
           done
