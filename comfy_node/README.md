@@ -13,6 +13,7 @@ management — it runs unchanged on a CPU-only install.
 | **FinePorn v4 / Krea 2 (Modal)** | FinePorn v4 / Krea 2 (Modal) |
 | **RedGPT2 GPT / Krea 2 (Modal)** | RedGPT2 / Krea 2 (Modal) |
 | **RedCraft v3 / Krea 2 (Modal)** | RedCraft v3 / Krea 2 (Modal) |
+| **Dark Beast v3 / Krea 2 (Modal)** | Dark Beast v3 / Krea 2 (Modal) |
 
 Nodes whose endpoint is unconfigured simply raise a clear error when run, so
 installing the package without deploying every service is fine.
@@ -179,6 +180,15 @@ resolve would break every render.
 
 Do not sync its settings with RedGPT2's: that edition publishes none and falls
 back to a template. `GET /defaults` on each says which it is.
+
+**Dark Beast v3 / Krea 2 (Modal)** → `IMAGE`, `INT` (seed), `STRING` (info)
+
+The fifth Krea 2 finetune here. Defaults to the turbo template — `euler` +
+`simple`, 8 steps, cfg 1 — because this version publishes no recipe of its own.
+
+Its Civitai listing is headlined by a *video* model ("H3 Director Edition") and
+quotes 6-10 steps; that belongs to a different base model on the same page and
+does not apply. This node renders stills.
 
 For all render nodes, set `aspect_ratio` to `custom` to use the width/height
 widgets, and use the optional `endpoint` widget to override the environment if

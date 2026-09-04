@@ -80,10 +80,13 @@ class CivitaiFile(NamedTuple):
         staged.parent.mkdir(parents=True, exist_ok=True)
 
         headers = {}
-        # Set for some services and not others: Civitai serves NSFW-flagged
-        # files only to an authenticated caller, so those need a Modal Secret on
-        # `download_models` while the rest download anonymously. Attaching the
-        # secret is the whole difference; nothing changes here.
+        # Set for some services and not others, and there is no rule that
+        # predicts which: gating is a per-model setting on Civitai's side. The
+        # NSFW flag in particular does *not* decide it — of the models here, one
+        # NSFW-flagged checkpoint 401s anonymously and another serves 206. The
+        # only reliable test is a ranged GET against the real download URL, so
+        # each service records what was actually observed. Attaching the secret
+        # is the whole difference; nothing changes here.
         #
         # Note that an unauthenticated request does not reliably 401 — Civitai
         # may answer 200 with an HTML error page, which lands in the staging

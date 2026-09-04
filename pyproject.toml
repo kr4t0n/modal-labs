@@ -51,6 +51,7 @@ testpaths = [
     "finepornv4/tests",
     "redgpt2gpt/tests",
     "redcraftv3/tests",
+    "darkbeastv3/tests",
 ]
 # Every service has a tests/test_workflow.py. importlib mode names modules by
 # full path, so identical basenames across projects no longer collide.
