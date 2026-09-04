@@ -86,6 +86,10 @@ export REDGPT2GPT_MODAL_URL=https://...
 export MODAL_KEY=wk-...  MODAL_SECRET=ws-...
 ```
 
+> Or set `MODAL_WORKSPACE=your-workspace` once and every service's URL is
+> derived from it — see [`comfy_node/README.md`](../comfy_node/README.md).
+> The explicit variable above still wins when set.
+
 ## Using it
 
 From ComfyUI, install the shared node package and the **RedGPT2 GPT / Krea 2

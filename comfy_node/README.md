@@ -32,6 +32,28 @@ Settings are read from the process environment first, then from `.env` in this
 directory. Nothing is stored in the workflow JSON, so exported workflows are
 safe to share.
 
+### One variable for every service
+
+Instead of a `<SERVICE>_MODAL_URL` per deployment, set your workspace once:
+
+```
+MODAL_WORKSPACE=your-workspace
+MODAL_KEY=wk-...
+MODAL_SECRET=ws-...
+```
+
+Modal composes endpoint hostnames deterministically, so each node derives its
+own URL from that — including services added later, with no new variable.
+
+A per-service `<SERVICE>_MODAL_URL` still wins when set, which is what you want
+for a second deployment of one service, or to point a node at an ephemeral
+`modal serve` URL.
+
+Derivation is a convenience, not a guarantee: Modal truncates or hashes
+hostnames past the DNS label limit, and a non-default Modal environment inserts
+a suffix. The URL printed by `modal deploy` is authoritative — set the explicit
+variable if they ever disagree.
+
 ### Migrating from the per-service packages
 
 Earlier revisions shipped `comfyui-ideogram4-modal` and

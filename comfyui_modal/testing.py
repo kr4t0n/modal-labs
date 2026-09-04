@@ -11,10 +11,45 @@ from __future__ import annotations
 
 import base64
 import gzip
+import sys
+import types
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, Request, Response
+
+
+def install_comfyui_stubs(progress_bar: type | None = None) -> None:
+    """Make `comfy_node` importable outside a real ComfyUI.
+
+    Lives here rather than in one test file because more than one suite needs
+    it, and the obvious per-file version — building fresh modules and calling
+    `sys.modules.setdefault` — is order-dependent in a way that fails silently:
+    whichever suite imports first installs its `comfy.utils.ProgressBar`, and
+    the other's is dropped on the floor. The symptom is a progress-bar test
+    asserting on a recorder that was never wired up.
+
+    So the module objects are reused if present, and `progress_bar` is assigned
+    rather than defaulted. A caller that needs a specific recorder always gets
+    it; a caller that only needs the import to succeed passes nothing and never
+    clobbers one.
+    """
+    comfy = sys.modules.get("comfy") or types.ModuleType("comfy")
+    comfy_utils = sys.modules.get("comfy.utils") or types.ModuleType("comfy.utils")
+
+    if progress_bar is not None:
+        comfy_utils.ProgressBar = progress_bar
+    elif not hasattr(comfy_utils, "ProgressBar"):
+        comfy_utils.ProgressBar = object
+
+    comfy.utils = comfy_utils
+    sys.modules["comfy"] = comfy
+    sys.modules["comfy.utils"] = comfy_utils
+    # The node package imports these at module scope but the tested paths do
+    # not touch them, so bare module objects are enough.
+    sys.modules.setdefault("torch", types.ModuleType("torch"))
+    sys.modules.setdefault("numpy", types.ModuleType("numpy"))
+
 
 # A 1x1 PNG, small enough to inline and still a real image.
 PNG = base64.b64decode(

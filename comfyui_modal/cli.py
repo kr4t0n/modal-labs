@@ -17,11 +17,44 @@ from typing import Any
 
 import requests
 
+# Every service's endpoint variable is <SLUG>_MODAL_URL, and every service names
+# its Modal app <slug>-comfyui with a class whose lowercased name is <slug>. Both
+# halves are asserted in tests/test_endpoint_convention.py, because this
+# derivation silently produces a wrong URL if either drifts.
+MODAL_URL_SUFFIX = "_MODAL_URL"
+WORKSPACE_VAR = "MODAL_WORKSPACE"
+
+
+def derive_url(env_var: str, workspace: str) -> str:
+    """The deployed URL a service *would* get, from the workspace name alone.
+
+    Modal composes web endpoint hostnames deterministically, so one workspace
+    name covers every service and adding one needs no new variable.
+
+    Convenience, not a guarantee: Modal truncates or hashes hostnames past the
+    DNS label limit, and a non-default Modal environment inserts a suffix. The
+    URL printed by `modal deploy` is authoritative — set the per-service
+    variable when they disagree.
+    """
+    if not env_var.endswith(MODAL_URL_SUFFIX):
+        raise ValueError(f"cannot derive a URL from {env_var!r}")
+    slug = env_var[: -len(MODAL_URL_SUFFIX)].lower()
+    return f"https://{workspace}--{slug}-comfyui-{slug}-web.modal.run"
+
 
 def endpoint(override: str | None, env_var: str) -> str:
     url = (override or os.environ.get(env_var, "")).strip().rstrip("/")
+    # The per-service variable wins, so a second deployment of one service, or
+    # an ephemeral `modal serve` URL, is still a one-variable override.
+    #
+    # The suffix check keeps a caller with a non-conforming variable name on the
+    # "not configured" message below, rather than a derivation error about a
+    # mechanism they were not using.
+    workspace = os.environ.get(WORKSPACE_VAR, "").strip()
+    if not url and workspace and env_var.endswith(MODAL_URL_SUFFIX):
+        url = derive_url(env_var, workspace)
     if not url:
-        sys.exit(f"set {env_var} or pass --url")
+        sys.exit(f"set {env_var} or {WORKSPACE_VAR}, or pass --url")
     return url
 
 

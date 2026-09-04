@@ -54,6 +54,19 @@ uv run modal setup        # once, to authenticate
 Then follow the project's own README — for example
 [`flux2klein/README.md`](flux2klein/README.md).
 
+To talk to deployed services, set your workspace once rather than a URL per
+service:
+
+```bash
+export MODAL_WORKSPACE=your-workspace
+export MODAL_KEY=wk-...  MODAL_SECRET=ws-...
+```
+
+Both the CLI clients and the ComfyUI nodes derive each endpoint from that, so
+adding a service needs no new variable. A per-service `<SLUG>_MODAL_URL` still
+takes precedence — use it for a second deployment of one service, or an
+ephemeral `modal serve` URL.
+
 ## Development
 
 ```bash

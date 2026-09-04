@@ -51,12 +51,45 @@ def setting(name: str, default: str = "") -> str:
     return os.environ.get(name) or _dotenv().get(name, default)
 
 
+# Deliberately duplicated from comfyui_modal/cli.py, which this package cannot
+# import: it is copied standalone into the user's ComfyUI, where only ComfyUI's
+# own dependencies exist. A test asserts the two derivations agree.
+MODAL_URL_SUFFIX = "_MODAL_URL"
+WORKSPACE_VAR = "MODAL_WORKSPACE"
+
+
+def derive_url(env_var: str, workspace: str) -> str:
+    """The deployed URL a service *would* get, from the workspace name alone.
+
+    Modal composes web endpoint hostnames deterministically, so one workspace
+    name covers every node here and adding a service needs no new variable.
+
+    Convenience, not a guarantee: Modal truncates or hashes hostnames past the
+    DNS label limit, and a non-default Modal environment inserts a suffix. Set
+    the per-service variable when the deploy output disagrees.
+    """
+    if not env_var.endswith(MODAL_URL_SUFFIX):
+        raise RuntimeError(f"cannot derive a URL from {env_var!r}")
+    slug = env_var[: -len(MODAL_URL_SUFFIX)].lower()
+    return f"https://{workspace}--{slug}-comfyui-{slug}-web.modal.run"
+
+
 def endpoint(override: str, env_var: str) -> str:
     url = (override or setting(env_var)).strip().rstrip("/")
+    # The per-service variable wins, so pointing one node at a second deployment
+    # or an ephemeral `modal serve` URL stays a one-variable override.
+    #
+    # The suffix check keeps a caller with a non-conforming variable name on the
+    # "not configured" message below, rather than a derivation error about a
+    # mechanism they were not using.
+    workspace = setting(WORKSPACE_VAR).strip()
+    if not url and workspace and env_var.endswith(MODAL_URL_SUFFIX):
+        url = derive_url(env_var, workspace)
     if not url:
         raise RuntimeError(
-            f"No endpoint configured. Set {env_var} (or fill the endpoint "
-            "widget) to the URL printed by `modal deploy app.py`."
+            f"No endpoint configured. Set {env_var}, or set {WORKSPACE_VAR} to "
+            "your Modal workspace to cover every service at once, or fill the "
+            "endpoint widget with the URL printed by `modal deploy app.py`."
         )
     return url
 

@@ -93,6 +93,10 @@ export MODAL_KEY=wk-...
 export MODAL_SECRET=ws-...
 ```
 
+> Or set `MODAL_WORKSPACE=<workspace>` once and every service's URL is derived
+> from it — see [`comfy_node/README.md`](../comfy_node/README.md). The explicit
+> variable above still wins when set.
+
 ## LoRA adapters
 
 An adapter can be layered onto the transformer for any variant. Omit `lora` and

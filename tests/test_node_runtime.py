@@ -16,12 +16,13 @@ import contextlib
 import importlib
 import sys
 import time
-import types
 from pathlib import Path
 from typing import ClassVar
 
 import pytest
 from aiohttp import web
+
+from comfyui_modal.testing import install_comfyui_stubs
 
 
 class RecordingProgressBar:
@@ -39,18 +40,9 @@ class RecordingProgressBar:
         self.updates.append((value, total if total is not None else self.total))
 
 
-def _install_comfyui_stubs() -> None:
-    comfy = types.ModuleType("comfy")
-    comfy_utils = types.ModuleType("comfy.utils")
-    comfy_utils.ProgressBar = RecordingProgressBar
-    comfy.utils = comfy_utils
-    sys.modules.setdefault("comfy", comfy)
-    sys.modules.setdefault("comfy.utils", comfy_utils)
-    sys.modules.setdefault("torch", types.ModuleType("torch"))
-    sys.modules.setdefault("numpy", types.ModuleType("numpy"))
-
-
-_install_comfyui_stubs()
+# Assigns rather than defaults, so this suite gets its recorder regardless of
+# whether another test module stubbed `comfy` first. See install_comfyui_stubs.
+install_comfyui_stubs(RecordingProgressBar)
 
 import comfy_node  # noqa: E402
 from comfy_node import _runtime  # noqa: E402
