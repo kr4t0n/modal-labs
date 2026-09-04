@@ -80,9 +80,14 @@ class CivitaiFile(NamedTuple):
         staged.parent.mkdir(parents=True, exist_ok=True)
 
         headers = {}
-        # Nothing sets this today — the downloads are anonymous. It exists so
-        # that if Civitai starts gating, attaching a Modal Secret is the whole
-        # fix, with no code change.
+        # Set for some services and not others: Civitai serves NSFW-flagged
+        # files only to an authenticated caller, so those need a Modal Secret on
+        # `download_models` while the rest download anonymously. Attaching the
+        # secret is the whole difference; nothing changes here.
+        #
+        # Note that an unauthenticated request does not reliably 401 — Civitai
+        # may answer 200 with an HTML error page, which lands in the staging
+        # file. The digest check below is what turns that into a refusal.
         if token := os.environ.get("CIVITAI_TOKEN"):
             headers["Authorization"] = f"Bearer {token}"
 

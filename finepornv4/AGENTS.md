@@ -102,6 +102,28 @@ bf16 is what this deployment was asked for; it is also the largest at 25.7 GB an
 gives the slowest cold start of any service in the repo. README documents the
 alternatives and what switching involves.
 
+## The download is authenticated, unlike ultra's
+
+`ultra` fetches its Civitai checkpoint anonymously and its docs say no
+credentials are needed. That is true *there* and false here: this model is
+NSFW-flagged, and Civitai answers `401` to an unauthenticated download. Verified
+by a ranged GET against the real URL, not inferred — the two services differ
+despite looking identical at the `CivitaiFile` level.
+
+Only `download_models` carries the Secret. Serving containers read the Volume,
+so the deployed app needs no credentials.
+
+The wiring copies `../flux2klein/app.py`, which has fetched token-gated Civitai
+adapters since before this service existed: a `CIVITAI_SECRET_NAME` constant
+read from `<PREFIX>_CIVITAI_SECRET` (default `civitai-secret`), passed inline to
+the decorator as `modal.Secret.from_name(..., required_keys=["CIVITAI_TOKEN"])`.
+`comfyui_modal/weights.py` turns that into an `Authorization: Bearer` header.
+
+The failure mode without a token is not a clean error: Civitai serves an HTML
+page with a `200`, which lands in the staging file and fails the SHA256 check.
+That is the digest earning its keep — it turns a silent corrupt install into a
+refusal.
+
 ## Known gaps
 
 - No image editing or img2img; `EmptyLatentImage` only.

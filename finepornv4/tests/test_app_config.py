@@ -56,6 +56,19 @@ def test_the_pinned_build_is_the_bf16_one():
     assert "bf16" in checkpoint.destination
 
 
+def test_the_civitai_secret_is_wired():
+    """This checkpoint is NSFW-flagged and 401s anonymously, unlike ultra's.
+
+    Same shape as flux2klein's `test_both_secrets_are_wired_for_the_two_weight_sources`;
+    only Civitai here, since the Hugging Face companions are ungated.
+
+    Without the token Civitai may answer 200 with an HTML error page rather than
+    failing outright, so dropping this would surface as a checksum mismatch
+    rather than an auth error.
+    """
+    assert app.CIVITAI_SECRET_NAME == "civitai-secret"
+
+
 def test_companions_come_from_an_ungated_hugging_face_mirror():
     """Nothing here should need a token; a gated flag would break deploys."""
     hf = [f for f in app.MODEL_FILES if isinstance(f, weights.HuggingFaceFile)]

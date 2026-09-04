@@ -22,6 +22,7 @@ Deploy-time configuration comes from the environment; see .env.example.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -47,7 +48,14 @@ APP_NAME = "finepornv4-comfyui"
 
 # --- Weights ----------------------------------------------------------------
 # The merge comes from Civitai with a verified digest; its companions are
-# ungated on Hugging Face. Nothing here needs a token.
+# ungated on Hugging Face.
+#
+# Unlike the ultra service, this download is *not* anonymous: the model is
+# NSFW-flagged, and Civitai answers 401 to an unauthenticated request for it.
+# Only `download_models` carries the secret — the serving containers read the
+# Volume and need nothing.
+CIVITAI_SECRET_NAME = os.environ.get("FINEPORNV4_CIVITAI_SECRET", "civitai-secret")
+
 MODEL_FILES = (
     # The version id is load-bearing: this model publishes int8, nvfp4, fp8 and
     # bf16 builds, and several of them share a filename upstream. Pinning the
@@ -92,9 +100,16 @@ image = service.build_image(["workflow", "server", "comfyui_modal"])
 app = modal.App(APP_NAME, image=image)
 
 
-@app.function(volumes={MODELS_DIR: models_volume}, timeout=7200)
+@app.function(
+    volumes={MODELS_DIR: models_volume},
+    timeout=7200,
+    secrets=[modal.Secret.from_name(CIVITAI_SECRET_NAME, required_keys=["CIVITAI_TOKEN"])],
+)
 def download_models(force: bool = False) -> list[str]:
-    """Populate the weights Volume, verifying the Civitai digest."""
+    """Populate the weights Volume, verifying the Civitai digest.
+
+    Needs a Civitai API token; see README, "Setup".
+    """
     written = weights.download_weights(MODEL_FILES, MODELS_DIR, force=force)
     models_volume.commit()
     return written

@@ -26,7 +26,12 @@ it — the fp8 and nvfp4 builds are a third to a half the size.
 
 Like ULTRA it is distributed as a **diffusion model only**, so the encoder and
 VAE come from Comfy-Org's Krea 2 mirror — the same two files that service uses,
-byte for byte. Nothing is gated; no token is required.
+byte for byte.
+
+Unlike ULTRA, **the checkpoint download needs a Civitai API token**: this model
+is NSFW-flagged and Civitai answers `401` to an unauthenticated request for it.
+The Hugging Face companions are ungated, and the serving containers need no
+credentials — only the one-off `download_models` does.
 
 | File | Size | Source |
 | --- | --- | --- |
@@ -49,9 +54,17 @@ the way into the Volume so the graph reads clearly.
 uv sync --all-groups
 cd finepornv4
 
+# One-off: the checkpoint is NSFW-flagged and 401s without a token.
+# Civitai -> Account settings -> API Keys.
+uv run modal secret create civitai-secret CIVITAI_TOKEN=...
+
 uv run modal run app.py::download_models   # ~31 GB into a Volume. One-off.
 uv run modal deploy app.py
 ```
+
+If you already created `civitai-secret` for another service, reuse it — nothing
+here is service-specific. Point `FINEPORNV4_CIVITAI_SECRET` at a different name
+if you keep more than one.
 
 `download_models` runs on CPU — no GPU charge — and is idempotent by
 destination; pass `--force` to refetch. Copy the endpoint URL from the deploy
@@ -236,3 +249,16 @@ pinned to 1024 undoes the resolution default.
 **`checksum mismatch ... refusing to install`.** Civitai served different bytes
 than the digest pinned in `app.py`. Re-check the file id against the API; the
 four precisions of v4 are easy to mix up.
+
+**`download_models` fails with 401 or writes a tiny file.** The Civitai token is
+missing, expired, or the Secret is under a different name. Check with:
+
+```bash
+curl -sS -o /dev/null -L -r 0-1023 -w '%{http_code}\n' \
+  -H "Authorization: Bearer $CIVITAI_TOKEN" \
+  "https://civitai.com/api/download/models/3197873?fileId=3079078"
+```
+
+`206` means the token works; `401` means it does not. Without the token Civitai
+serves an HTML error page rather than the safetensors, which the digest check
+then rejects — so the failure is loud either way.

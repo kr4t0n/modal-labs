@@ -40,13 +40,17 @@ ignore = [
 known-first-party = ["workflow", "server", "app"]
 
 [tool.pytest.ini_options]
+# Every service's suite must be listed here. A new project directory is not
+# picked up automatically, and the failure is silent: the suite simply never
+# runs, and a green `pytest -q` says nothing about it.
 testpaths = [
     "tests",
     "flux2klein/tests",
     "ultra/tests",
     "zimageturbostableyogi/tests",
+    "finepornv4/tests",
 ]
-# Both services have a tests/test_workflow.py. importlib mode names modules by
+# Every service has a tests/test_workflow.py. importlib mode names modules by
 # full path, so identical basenames across projects no longer collide.
 addopts = "--import-mode=importlib"
 # The shared package lives at the repository root and is not installed.
