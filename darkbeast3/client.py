@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Command-line client for the deployed Dark Beast v3 endpoint.
 
-export DARKBEASTV3_MODAL_URL=https://...modal.run
+export DARKBEAST3_MODAL_URL=https://...modal.run
 export MODAL_KEY=wk-...  MODAL_SECRET=ws-...
 
 ./client.py generate "a close-up portrait in hard directional light" --aspect-ratio 3:4
@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import workflow
 from comfyui_modal import cli
 
-ENV_URL = "DARKBEASTV3_MODAL_URL"
+ENV_URL = "DARKBEAST3_MODAL_URL"
 
 
 def main() -> None:

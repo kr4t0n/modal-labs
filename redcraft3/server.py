@@ -29,7 +29,7 @@ class GenerateRequest(BaseGenerateRequest):
     denoise: float = Field(default=1.0, ge=0.0, le=1.0)
 
     sampler_name: str = workflow.DEFAULT_SAMPLER
-    filename_prefix: str = "redcraftv3"
+    filename_prefix: str = "redcraft3"
 
 
 def _resolve(request: GenerateRequest) -> workflow.GenerationParams:

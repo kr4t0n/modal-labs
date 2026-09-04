@@ -117,7 +117,7 @@ def resolve_params(
     sampler_name: str = DEFAULT_SAMPLER,
     scheduler: str = DEFAULT_SCHEDULER,
     denoise: float = 1.0,
-    filename_prefix: str = "redcraftv3",
+    filename_prefix: str = "redcraft3",
 ) -> GenerationParams:
     """Validate and snap the request into a fully specified parameter set."""
     if not prompt or not prompt.strip():

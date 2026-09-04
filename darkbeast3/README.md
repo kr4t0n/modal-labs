@@ -26,7 +26,7 @@ point a local or clustered ComfyUI at the URL and render remotely.
 ## Licence
 
 **Krea 2 Community License.** Everything derived from Krea 2 — this service,
-`ultra/`, `finepornv4/`, `redgpt2gpt/` and `redcraftv3/` alike — inherits it.
+`ultra/`, `finepornv4/`, `redgpt2gpt/` and `redcraft3/` alike — inherits it.
 Free commercial use is conditional on your **company-wide annual revenue being
 under $1,000,000 USD**, on a trailing twelve-month basis, counting affiliated
 entities under common ownership. You own the outputs you generate provided you
@@ -65,7 +65,7 @@ publishes FLUX.2 klein versions.
 ```bash
 # from the repository root
 uv sync --all-groups
-cd darkbeastv3
+cd darkbeast3
 
 uv run modal run app.py::download_models   # ~19 GB into a Volume. One-off.
 uv run modal deploy app.py
@@ -73,10 +73,10 @@ uv run modal deploy app.py
 
 `download_models` runs on CPU — no GPU charge — and is idempotent by
 destination; pass `--force` to refetch. Copy the endpoint URL from the deploy
-output; you want the one for `DarkBeastV3.web`.
+output; you want the one for `DarkBeast3.web`.
 
 ```bash
-export DARKBEASTV3_MODAL_URL=https://...
+export DARKBEAST3_MODAL_URL=https://...
 export MODAL_KEY=wk-...  MODAL_SECRET=ws-...
 ```
 
@@ -102,7 +102,7 @@ uv run python client.py defaults
 ```
 
 Or as a plain ComfyUI server — `/prompt`, `/history`, `/view`, `/object_info`
-and `/ws` all work unmodified, and `workflows/darkbeastv3_krea2_t2i_api.json` is
+and `/ws` all work unmodified, and `workflows/darkbeast3_krea2_t2i_api.json` is
 a ready-to-POST graph.
 
 ## Sampler defaults, and where they come from
@@ -122,7 +122,7 @@ make. `GET /defaults` says so outright in its `source` field.
 The model description does give **"6-10 steps"**, but that figure describes the
 H3 *video* edition's single-pass sampling on a different base model. It is not
 transferable, and adopting it here would be importing a number from another
-model. Contrast `redcraftv3/`, by the same author over the same base, whose
+model. Contrast `redcraft3/`, by the same author over the same base, whose
 version notes *do* publish a recipe — `/defaults` on each names its own source,
 so don't copy settings between them.
 
@@ -190,13 +190,13 @@ Deploy-time settings come from the environment; see `.env.example`.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `DARKBEASTV3_GPU` | `L40S` | See below |
-| `DARKBEASTV3_MIN_CONTAINERS` | `0` | Warm containers |
-| `DARKBEASTV3_MAX_CONTAINERS` | `1` | Raise only if every client submits and polls in one request |
-| `DARKBEASTV3_SCALEDOWN_WINDOW` | `300` | Seconds warm after the last request |
-| `DARKBEASTV3_CONCURRENT_INPUTS` | `20` | Per container |
-| `DARKBEASTV3_REQUIRE_AUTH` | `1` | Proxy auth on the API |
-| `DARKBEASTV3_UI_REQUIRE_AUTH` | `0` | Browsers cannot attach the headers |
+| `DARKBEAST3_GPU` | `L40S` | See below |
+| `DARKBEAST3_MIN_CONTAINERS` | `0` | Warm containers |
+| `DARKBEAST3_MAX_CONTAINERS` | `1` | Raise only if every client submits and polls in one request |
+| `DARKBEAST3_SCALEDOWN_WINDOW` | `300` | Seconds warm after the last request |
+| `DARKBEAST3_CONCURRENT_INPUTS` | `20` | Per container |
+| `DARKBEAST3_REQUIRE_AUTH` | `1` | Proxy auth on the API |
+| `DARKBEAST3_UI_REQUIRE_AUTH` | `0` | Browsers cannot attach the headers |
 
 ### Choosing a GPU
 
@@ -217,7 +217,7 @@ uv run python client.py generate "benchmark"   # warm, compare duration_s
 ## Project structure
 
 ```
-darkbeastv3/
+darkbeast3/
 ├── app.py         Modal entrypoint: weights, container, endpoints
 ├── server.py      Request model, resolver, /defaults route
 ├── workflow.py    The Krea 2 graph in ComfyUI API format
@@ -229,7 +229,7 @@ darkbeastv3/
 ## Troubleshooting
 
 **First request takes minutes.** Cold start: image pull, ComfyUI boot, then the
-weights onto the GPU. Set `DARKBEASTV3_MIN_CONTAINERS=1` if latency matters more
+weights onto the GPU. Set `DARKBEAST3_MIN_CONTAINERS=1` if latency matters more
 than idle cost.
 
 **The wrong precision landed on the Volume.** All five builds share a filename

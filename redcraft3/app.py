@@ -39,7 +39,7 @@ from comfyui_modal.service import (  # noqa: E402
     UI_PORT,
 )
 
-APP_NAME = "redcraftv3-comfyui"
+APP_NAME = "redcraft3-comfyui"
 
 # --- Weights ----------------------------------------------------------------
 # The finetune comes from Civitai with a verified digest; its companions are
@@ -76,15 +76,15 @@ MODEL_FILES = (
 REQUIRED_MODELS = weights.destinations(MODEL_FILES)
 
 EXTRA_MODEL_PATHS_YAML = service.extra_model_paths_yaml(
-    "redcraftv3", ("diffusion_models", "text_encoders", "vae")
+    "redcraft3", ("diffusion_models", "text_encoders", "vae")
 )
 
 # ~18 GB of weights; the text encoder offloads after encoding, so the sampling
 # working set is nearer 13 GB — the same shape as ultra and redgpt2gpt. L40S is
 # the safe default. See README, "Choosing a GPU".
-SETTINGS = service.Settings.from_env("REDCRAFTV3", gpu="L40S")
+SETTINGS = service.Settings.from_env("REDCRAFT3", gpu="L40S")
 
-models_volume = modal.Volume.from_name("redcraftv3-models", create_if_missing=True)
+models_volume = modal.Volume.from_name("redcraft3-models", create_if_missing=True)
 
 image = service.build_image(["workflow", "server", "comfyui_modal"])
 
@@ -109,7 +109,7 @@ def download_models(force: bool = False) -> list[str]:
     max_containers=SETTINGS.max_containers,
 )
 @modal.concurrent(max_inputs=SETTINGS.concurrent_inputs, target_inputs=SETTINGS.concurrent_inputs)
-class RedCraftV3:
+class RedCraft3:
     """A container running ComfyUI, fronted by the ASGI app in server.py."""
 
     @modal.enter()
@@ -178,7 +178,7 @@ def main(
     batch_size: int = 1,
 ) -> None:
     """End-to-end smoke test: `modal run app.py`."""
-    params, images = RedCraftV3().generate.remote(
+    params, images = RedCraft3().generate.remote(
         prompt=prompt,
         width=width,
         height=height,
@@ -189,7 +189,7 @@ def main(
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     for index, data in enumerate(images):
-        path = destination / f"redcraftv3_{params['seed']}_{index}.png"
+        path = destination / f"redcraft3_{params['seed']}_{index}.png"
         path.write_bytes(data)
         print(f"wrote {path} ({len(data) / 1e6:.2f} MB)")
     print(

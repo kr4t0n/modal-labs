@@ -19,8 +19,8 @@ from comfyui_modal import weights  # noqa: E402
 
 def test_extra_model_paths_covers_every_folder_used():
     config = yaml.safe_load(app.EXTRA_MODEL_PATHS_YAML)
-    assert set(config) == {"redcraftv3"}
-    section = config["redcraftv3"]
+    assert set(config) == {"redcraft3"}
+    section = config["redcraft3"]
     assert section["base_path"] == app.MODELS_DIR
     configured = {v for k, v in section.items() if k != "base_path"}
     for destination in app.REQUIRED_MODELS:
@@ -114,5 +114,5 @@ def test_the_krea2_companions_match_the_ultra_service_exactly():
 
 def test_this_service_claims_its_own_app_and_volume():
     """Four Krea 2 deployments coexist; colliding names would fight."""
-    assert app.APP_NAME == "redcraftv3-comfyui"
-    assert "redcraftv3" in str(app.models_volume)
+    assert app.APP_NAME == "redcraft3-comfyui"
+    assert "redcraft3" in str(app.models_volume)

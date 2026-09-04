@@ -9,7 +9,7 @@ The H3 in that title is a *video* model and a different version on the same page
 (`3274224`). Its short-film pipeline, 2K upscaling and 6-10 step guidance do not
 apply here. See AGENTS.md.
 
-Like the ultra, finepornv4, redgpt2gpt and redcraftv3 services it carries no
+Like the ultra, finepornv4, redgpt2gpt and redcraft3 services it carries no
 text encoder or VAE of its own, so the Qwen3-VL-4B encoder and Qwen-Image VAE
 come from Comfy-Org's Krea 2 mirror on Hugging Face — the same two files all
 five use.
@@ -44,7 +44,7 @@ from comfyui_modal.service import (  # noqa: E402
     UI_PORT,
 )
 
-APP_NAME = "darkbeastv3-comfyui"
+APP_NAME = "darkbeast3-comfyui"
 
 # --- Weights ----------------------------------------------------------------
 # The finetune comes from Civitai with a verified digest; its companions are
@@ -82,15 +82,15 @@ MODEL_FILES = (
 REQUIRED_MODELS = weights.destinations(MODEL_FILES)
 
 EXTRA_MODEL_PATHS_YAML = service.extra_model_paths_yaml(
-    "darkbeastv3", ("diffusion_models", "text_encoders", "vae")
+    "darkbeast3", ("diffusion_models", "text_encoders", "vae")
 )
 
 # ~19 GB of weights; the text encoder offloads after encoding, so the sampling
 # working set is nearer 14 GB — the same shape as ultra, whose checkpoint is
 # also a 13.8 GB int8 build. L40S is the safe default. See README.
-SETTINGS = service.Settings.from_env("DARKBEASTV3", gpu="L40S")
+SETTINGS = service.Settings.from_env("DARKBEAST3", gpu="L40S")
 
-models_volume = modal.Volume.from_name("darkbeastv3-models", create_if_missing=True)
+models_volume = modal.Volume.from_name("darkbeast3-models", create_if_missing=True)
 
 image = service.build_image(["workflow", "server", "comfyui_modal"])
 
@@ -115,7 +115,7 @@ def download_models(force: bool = False) -> list[str]:
     max_containers=SETTINGS.max_containers,
 )
 @modal.concurrent(max_inputs=SETTINGS.concurrent_inputs, target_inputs=SETTINGS.concurrent_inputs)
-class DarkBeastV3:
+class DarkBeast3:
     """A container running ComfyUI, fronted by the ASGI app in server.py."""
 
     @modal.enter()
@@ -184,7 +184,7 @@ def main(
     batch_size: int = 1,
 ) -> None:
     """End-to-end smoke test: `modal run app.py`."""
-    params, images = DarkBeastV3().generate.remote(
+    params, images = DarkBeast3().generate.remote(
         prompt=prompt,
         width=width,
         height=height,
@@ -195,7 +195,7 @@ def main(
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     for index, data in enumerate(images):
-        path = destination / f"darkbeastv3_{params['seed']}_{index}.png"
+        path = destination / f"darkbeast3_{params['seed']}_{index}.png"
         path.write_bytes(data)
         print(f"wrote {path} ({len(data) / 1e6:.2f} MB)")
     print(

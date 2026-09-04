@@ -66,8 +66,8 @@ def test_every_service_registers_its_node():
         "ZImageTurboStableYogiModal",
         "FinePornV4Modal",
         "RedGPT2GPTModal",
-        "RedCraftV3Modal",
-        "DarkBeastV3Modal",
+        "RedCraft3Modal",
+        "DarkBeast3Modal",
     }
     assert set(comfy_node.NODE_DISPLAY_NAME_MAPPINGS) == set(comfy_node.NODE_CLASS_MAPPINGS)
 
@@ -147,7 +147,7 @@ def test_every_service_registers_its_node():
             ],
         ),
         (
-            "RedCraftV3Modal",
+            "RedCraft3Modal",
             [
                 "prompt",
                 "negative_prompt",
@@ -164,7 +164,7 @@ def test_every_service_registers_its_node():
             ],
         ),
         (
-            "DarkBeastV3Modal",
+            "DarkBeast3Modal",
             [
                 "prompt",
                 "negative_prompt",
@@ -214,8 +214,8 @@ def test_nodes_return_an_image_seed_and_info():
         "ZImageTurboStableYogiModal",
         "FinePornV4Modal",
         "RedGPT2GPTModal",
-        "RedCraftV3Modal",
-        "DarkBeastV3Modal",
+        "RedCraft3Modal",
+        "DarkBeast3Modal",
     ):
         node = comfy_node.NODE_CLASS_MAPPINGS[node_id]
         assert node.RETURN_TYPES == ("IMAGE", "INT", "STRING")
@@ -476,8 +476,8 @@ def test_shared_geometry_defaults_are_unchanged_for_other_nodes():
         "UltraModal",
         "ZImageTurboStableYogiModal",
         "RedGPT2GPTModal",
-        "RedCraftV3Modal",
-        "DarkBeastV3Modal",
+        "RedCraft3Modal",
+        "DarkBeast3Modal",
     ):
         widgets = comfy_node.NODE_CLASS_MAPPINGS[node_id].INPUT_TYPES()["required"]
         assert widgets["width"][1]["default"] == 1024

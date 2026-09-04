@@ -58,7 +58,7 @@ the klein services use.
 ```bash
 # from the repository root
 uv sync --all-groups
-cd redcraftv3
+cd redcraft3
 
 uv run modal run app.py::download_models   # ~18 GB into a Volume. One-off.
 uv run modal deploy app.py
@@ -66,10 +66,10 @@ uv run modal deploy app.py
 
 `download_models` runs on CPU — no GPU charge — and is idempotent by
 destination; pass `--force` to refetch. Copy the endpoint URL from the deploy
-output; you want the one for `RedCraftV3.web`.
+output; you want the one for `RedCraft3.web`.
 
 ```bash
-export REDCRAFTV3_MODAL_URL=https://...
+export REDCRAFT3_MODAL_URL=https://...
 export MODAL_KEY=wk-...  MODAL_SECRET=ws-...
 ```
 
@@ -95,7 +95,7 @@ uv run python client.py defaults
 ```
 
 Or as a plain ComfyUI server — `/prompt`, `/history`, `/view`, `/object_info`
-and `/ws` all work unmodified, and `workflows/redcraftv3_krea2_t2i_api.json` is
+and `/ws` all work unmodified, and `workflows/redcraft3_krea2_t2i_api.json` is
 a ready-to-POST graph.
 
 ## Sampler defaults
@@ -174,13 +174,13 @@ Deploy-time settings come from the environment; see `.env.example`.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `REDCRAFTV3_GPU` | `L40S` | See below |
-| `REDCRAFTV3_MIN_CONTAINERS` | `0` | Warm containers |
-| `REDCRAFTV3_MAX_CONTAINERS` | `1` | Raise only if every client submits and polls in one request |
-| `REDCRAFTV3_SCALEDOWN_WINDOW` | `300` | Seconds warm after the last request |
-| `REDCRAFTV3_CONCURRENT_INPUTS` | `20` | Per container |
-| `REDCRAFTV3_REQUIRE_AUTH` | `1` | Proxy auth on the API |
-| `REDCRAFTV3_UI_REQUIRE_AUTH` | `0` | Browsers cannot attach the headers |
+| `REDCRAFT3_GPU` | `L40S` | See below |
+| `REDCRAFT3_MIN_CONTAINERS` | `0` | Warm containers |
+| `REDCRAFT3_MAX_CONTAINERS` | `1` | Raise only if every client submits and polls in one request |
+| `REDCRAFT3_SCALEDOWN_WINDOW` | `300` | Seconds warm after the last request |
+| `REDCRAFT3_CONCURRENT_INPUTS` | `20` | Per container |
+| `REDCRAFT3_REQUIRE_AUTH` | `1` | Proxy auth on the API |
+| `REDCRAFT3_UI_REQUIRE_AUTH` | `0` | Browsers cannot attach the headers |
 
 ### Choosing a GPU
 
@@ -201,7 +201,7 @@ uv run python client.py generate "benchmark"   # warm, compare duration_s
 ## Project structure
 
 ```
-redcraftv3/
+redcraft3/
 ├── app.py         Modal entrypoint: weights, container, endpoints
 ├── server.py      Request model, resolver, /defaults route
 ├── workflow.py    The Krea 2 graph in ComfyUI API format
@@ -213,7 +213,7 @@ redcraftv3/
 ## Troubleshooting
 
 **First request takes minutes.** Cold start: image pull, ComfyUI boot, then the
-weights onto the GPU. Set `REDCRAFTV3_MIN_CONTAINERS=1` if latency matters more
+weights onto the GPU. Set `REDCRAFT3_MIN_CONTAINERS=1` if latency matters more
 than idle cost.
 
 **`er_sde` is rejected at queue time.** That sampler is not in every ComfyUI

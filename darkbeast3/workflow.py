@@ -56,7 +56,7 @@ __all__ = [
 # says neither which precision it is nor that it is the Krea 2 build rather than
 # the H3 one. The destination in app.py is what makes the graph unambiguous.
 DIFFUSION_MODEL = "darkbeast_v3_krea2_int8.safetensors"
-# Shared verbatim with the ultra, finepornv4, redgpt2gpt and redcraftv3
+# Shared verbatim with the ultra, finepornv4, redgpt2gpt and redcraft3
 # services: same base model, same companions. A test asserts they stay in step.
 TEXT_ENCODER = "qwen3vl_4b_fp8_scaled.safetensors"
 CLIP_TYPE = "krea2"
@@ -76,7 +76,7 @@ DEFAULT_SAMPLER = "euler"
 DEFAULT_SCHEDULER = "simple"
 
 # Reported through /defaults so a caller can tell a template fallback from a
-# published recipe without reading the source. redcraftv3, by the same author
+# published recipe without reading the source. redcraft3, by the same author
 # over the same base, does publish one and says so there.
 DEFAULTS_SOURCE = "ComfyUI's official Krea 2 turbo template; this version publishes no settings"
 
@@ -115,7 +115,7 @@ def resolve_params(
     sampler_name: str = DEFAULT_SAMPLER,
     scheduler: str = DEFAULT_SCHEDULER,
     denoise: float = 1.0,
-    filename_prefix: str = "darkbeastv3",
+    filename_prefix: str = "darkbeast3",
 ) -> GenerationParams:
     """Validate and snap the request into a fully specified parameter set."""
     if not prompt or not prompt.strip():

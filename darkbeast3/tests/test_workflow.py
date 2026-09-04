@@ -155,7 +155,7 @@ def test_suite_imported_this_projects_modules():
     assert Path(server.__file__).resolve().parent == Path(__file__).resolve().parents[1]
 
 
-GOLDEN = Path(__file__).resolve().parents[1] / "workflows" / "darkbeastv3_krea2_t2i_api.json"
+GOLDEN = Path(__file__).resolve().parents[1] / "workflows" / "darkbeast3_krea2_t2i_api.json"
 GOLDEN_PARAMS = {
     "prompt": "a close-up portrait in hard directional light, heavy film grain",
     "width": 1024,

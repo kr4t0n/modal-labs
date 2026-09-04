@@ -14,15 +14,15 @@ environment and tooling.
 | [`zimageturbostableyogi/`](zimageturbostableyogi/) | Stable Yogi's Z-Image Turbo finetune — the cheapest of the set, a 6 GB fp8 model on a 24 GB L4 |
 | [`finepornv4/`](finepornv4/) | FinePorn v4, a Krea 2 merge — bf16, the heaviest of the set, and the only one rendering above 1 MP by default |
 | [`redgpt2gpt/`](redgpt2gpt/) | RedGPT2, GPT edition — a Krea 2 finetune, fp8, the lightest of the Krea 2 services |
-| [`redcraftv3/`](redcraftv3/) | RedCraft v3 — a Krea 2 finetune, fp8, the only one whose author publishes a sampler recipe |
-| [`darkbeastv3/`](darkbeastv3/) | Dark Beast v3 — a Krea 2 finetune, int8, from a listing whose headline product is a video model |
+| [`redcraft3/`](redcraft3/) | RedCraft v3 — a Krea 2 finetune, fp8, the only one whose author publishes a sampler recipe |
+| [`darkbeast3/`](darkbeast3/) | Dark Beast v3 — a Krea 2 finetune, int8, from a listing whose headline product is a video model |
 
 Each exposes one URL that is simultaneously a real ComfyUI server and a typed
 `/generate` contract, so a CPU-only ComfyUI can stay the UI while the GPU work
 happens on Modal.
 
 **Five of them serve Krea 2** — `ultra/`, `finepornv4/`, `redgpt2gpt/`,
-`redcraftv3/` and `darkbeastv3/` — with different finetunes over the same base,
+`redcraft3/` and `darkbeast3/` — with different finetunes over the same base,
 sharing a text encoder and VAE. A test asserts those companions stay identical
 across all five; divergence would change output without failing. All five also
 inherit the Krea 2 Community License, whose free commercial use is capped by
@@ -34,7 +34,7 @@ template. `GET /defaults` on each names its own source — do not sync settings
 between them.
 
 Four projects carry a version or edition in their name — `finepornv4/`,
-`redgpt2gpt/`, `redcraftv3/` and `darkbeastv3/`. Their upstreams publish several
+`redgpt2gpt/`, `redcraft3/` and `darkbeast3/`. Their upstreams publish several
 incompatible builds under one listing, so a later release gets a sibling
 directory and its own endpoint rather than replacing what is deployed, letting
 the two be compared while existing workflows keep their URL.

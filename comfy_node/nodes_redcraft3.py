@@ -1,4 +1,4 @@
-"""Dark Beast v3 (Krea 2) node, rendering on a remote Modal deployment."""
+"""RedCraft v3 (Krea 2) node, rendering on a remote Modal deployment."""
 
 from __future__ import annotations
 
@@ -15,15 +15,18 @@ from ._runtime import (
     to_tensor,
 )
 
-ENV_URL = "DARKBEASTV3_MODAL_URL"
-CATEGORY = "Dark Beast v3 / Krea 2 (Modal)"
+ENV_URL = "REDCRAFT3_MODAL_URL"
+CATEGORY = "RedCraft v3 / Krea 2 (Modal)"
 
+# `er_sde` is listed first because the version notes name it first — but `euler`
+# is the default, since er_sde is not present in every ComfyUI build and a
+# default that fails to resolve would break every render.
 SAMPLERS = ["euler", "er_sde", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde", "ddim"]
 SCHEDULERS = ["simple", "beta", "normal", "karras", "sgm_uniform", "exponential"]
 
 
-class DarkBeastV3Modal:
-    """Text to image on the remote Dark Beast v3 deployment."""
+class RedCraft3Modal:
+    """Text to image on the remote RedCraft v3 deployment."""
 
     @classmethod
     def INPUT_TYPES(cls) -> dict[str, Any]:
@@ -33,7 +36,7 @@ class DarkBeastV3Modal:
                     "STRING",
                     {
                         "multiline": True,
-                        "default": "a close-up portrait in hard directional light, heavy film grain",
+                        "default": "a rain-soaked neon alley at night, shot on a handheld camera",
                     },
                 ),
                 "negative_prompt": (
@@ -41,11 +44,19 @@ class DarkBeastV3Modal:
                     {
                         "multiline": True,
                         "default": "",
-                        "tooltip": "Has no effect at the default cfg 1; raise cfg to use it.",
+                        "tooltip": "Has no effect at the card's cfg 1; raise cfg to use it.",
                     },
                 ),
                 **common_geometry_inputs(),
-                "steps": ("INT", {"default": 8, "min": 1, "max": 200}),
+                "steps": (
+                    "INT",
+                    {
+                        "default": 10,
+                        "min": 1,
+                        "max": 200,
+                        "tooltip": "The version notes publish 8-12; 10 is the midpoint.",
+                    },
+                ),
                 "cfg": (
                     "FLOAT",
                     {
@@ -53,10 +64,16 @@ class DarkBeastV3Modal:
                         "min": 0.0,
                         "max": 100.0,
                         "step": 0.1,
-                        "tooltip": "Krea 2 turbo samples at 1. Raise only if output looks undercooked.",
+                        "tooltip": "The card specifies 1. Raising it is off-recipe.",
                     },
                 ),
-                "sampler_name": (SAMPLERS, {"default": "euler"}),
+                "sampler_name": (
+                    SAMPLERS,
+                    {
+                        "default": "euler",
+                        "tooltip": "The card names er_sde and euler interchangeably.",
+                    },
+                ),
                 "scheduler": (SCHEDULERS, {"default": "simple"}),
             },
             "optional": endpoint_inputs(ENV_URL),
@@ -68,9 +85,7 @@ class DarkBeastV3Modal:
     RETURN_NAMES = ("image", "seed", "info")
     FUNCTION = "generate"
     CATEGORY = CATEGORY
-    DESCRIPTION = (
-        "Render with Dark Beast v3 (Krea 2) on a Modal-hosted ComfyUI and return the image."
-    )
+    DESCRIPTION = "Render with RedCraft v3 (Krea 2) on a Modal-hosted ComfyUI and return the image."
 
     def generate(
         self,
@@ -129,6 +144,6 @@ def _endpoint_url(override: str) -> str:
     return endpoint(override, ENV_URL)
 
 
-NODE_CLASS_MAPPINGS = {"DarkBeastV3Modal": DarkBeastV3Modal}
+NODE_CLASS_MAPPINGS = {"RedCraft3Modal": RedCraft3Modal}
 
-NODE_DISPLAY_NAME_MAPPINGS = {"DarkBeastV3Modal": "Dark Beast v3 / Krea 2 (Modal)"}
+NODE_DISPLAY_NAME_MAPPINGS = {"RedCraft3Modal": "RedCraft v3 / Krea 2 (Modal)"}

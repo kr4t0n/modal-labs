@@ -81,8 +81,8 @@ and its own endpoint rather than replacing this one. Existing workflows keep
 their URL and the two can be compared.
 
 The name also feeds URL derivation — see `tests/test_endpoint_convention.py`.
-Directory `redcraftv3`, app `redcraftv3-comfyui`, class `RedCraftV3`, env
-`REDCRAFTV3_MODAL_URL`. Break any of those and `MODAL_WORKSPACE` silently
+Directory `redcraft3`, app `redcraft3-comfyui`, class `RedCraft3`, env
+`REDCRAFT3_MODAL_URL`. Break any of those and `MODAL_WORKSPACE` silently
 derives a URL pointing at nothing.
 
 ## Known gaps

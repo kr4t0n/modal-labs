@@ -8,7 +8,7 @@ This file covers only what differs.
 
 ## The fifth Krea 2 service
 
-`ultra`, `finepornv4`, `redgpt2gpt`, `redcraftv3` and this one all serve Krea 2
+`ultra`, `finepornv4`, `redgpt2gpt`, `redcraft3` and this one all serve Krea 2
 turbo as a diffusion-model-only safetensors with Comfy-Org's Qwen3-VL-4B encoder
 and the Qwen-Image VAE. The graph shape is identical across all five.
 
@@ -42,7 +42,7 @@ Two consequences worth guarding, and both are tested:
   instead. This is the same trap `redgpt2gpt` has with "4H + 6L" — a number
   sitting in prose next to a model it does not describe.
 
-Contrast `redcraftv3`, by the same author over the same base, whose version
+Contrast `redcraft3`, by the same author over the same base, whose version
 notes *do* publish a recipe. `DEFAULTS_SOURCE` on each says which it is and
 `/defaults` returns it, so the two are distinguishable without reading source.
 Do not sync settings between them in either direction.
@@ -80,13 +80,13 @@ fix — copy the wiring from `../finepornv4/app.py`.
 
 ## Why the version is in the name
 
-Same reasoning as `finepornv4`, `redgpt2gpt` and `redcraftv3`: the upstream
+Same reasoning as `finepornv4`, `redgpt2gpt` and `redcraft3`: the upstream
 listing publishes many incompatible builds, so a later Dark Beast release gets a
 sibling directory and its own endpoint rather than replacing this one.
 
 The name also feeds URL derivation — see `tests/test_endpoint_convention.py`.
-Directory `darkbeastv3`, app `darkbeastv3-comfyui`, class `DarkBeastV3`, env
-`DARKBEASTV3_MODAL_URL`. Break any of those and `MODAL_WORKSPACE` silently
+Directory `darkbeast3`, app `darkbeast3-comfyui`, class `DarkBeast3`, env
+`DARKBEAST3_MODAL_URL`. Break any of those and `MODAL_WORKSPACE` silently
 derives a URL pointing at nothing.
 
 ## Known gaps

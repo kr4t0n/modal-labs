@@ -19,8 +19,8 @@ from comfyui_modal import weights  # noqa: E402
 
 def test_extra_model_paths_covers_every_folder_used():
     config = yaml.safe_load(app.EXTRA_MODEL_PATHS_YAML)
-    assert set(config) == {"darkbeastv3"}
-    section = config["darkbeastv3"]
+    assert set(config) == {"darkbeast3"}
+    section = config["darkbeast3"]
     assert section["base_path"] == app.MODELS_DIR
     configured = {v for k, v in section.items() if k != "base_path"}
     for destination in app.REQUIRED_MODELS:
@@ -62,7 +62,7 @@ def test_the_file_id_is_what_selects_the_precision():
 def test_no_civitai_secret_is_attached():
     """Verified anonymous: a ranged GET returns 206 with real safetensors bytes.
 
-    Notable because this listing *is* NSFW-flagged, unlike redcraftv3's — so the
+    Notable because this listing *is* NSFW-flagged, unlike redcraft3's — so the
     flag predicts nothing and the check is the only thing that settles it.
     Asserted so the "needs no credentials" claim in the README stays honest; the
     same claim was wrong for finepornv4 and cost a release.
@@ -81,7 +81,7 @@ def test_companions_come_from_an_ungated_hugging_face_mirror():
 def test_the_krea2_companions_match_the_ultra_service_exactly():
     """Five services, one base model, one pair of companion files.
 
-    finepornv4, redgpt2gpt and redcraftv3 carry the same assertion against
+    finepornv4, redgpt2gpt and redcraft3 carry the same assertion against
     ultra, so pinning each to ultra transitively pins all five. If these diverge
     it means one picked up a different encoder or VAE build, which changes
     output without failing.
@@ -117,5 +117,5 @@ def test_the_krea2_companions_match_the_ultra_service_exactly():
 
 def test_this_service_claims_its_own_app_and_volume():
     """Five Krea 2 deployments coexist; colliding names would fight."""
-    assert app.APP_NAME == "darkbeastv3-comfyui"
-    assert "darkbeastv3" in str(app.models_volume)
+    assert app.APP_NAME == "darkbeast3-comfyui"
+    assert "darkbeast3" in str(app.models_volume)

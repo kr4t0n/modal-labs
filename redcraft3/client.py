@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Command-line client for the deployed RedCraft v3 endpoint.
 
-export REDCRAFTV3_MODAL_URL=https://...modal.run
+export REDCRAFT3_MODAL_URL=https://...modal.run
 export MODAL_KEY=wk-...  MODAL_SECRET=ws-...
 
 ./client.py generate "a rain-soaked neon alley at night" --aspect-ratio 16:9
@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import workflow
 from comfyui_modal import cli
 
-ENV_URL = "REDCRAFTV3_MODAL_URL"
+ENV_URL = "REDCRAFT3_MODAL_URL"
 
 
 def main() -> None:

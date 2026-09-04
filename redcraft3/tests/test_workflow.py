@@ -155,7 +155,7 @@ def test_suite_imported_this_projects_modules():
     assert Path(server.__file__).resolve().parent == Path(__file__).resolve().parents[1]
 
 
-GOLDEN = Path(__file__).resolve().parents[1] / "workflows" / "redcraftv3_krea2_t2i_api.json"
+GOLDEN = Path(__file__).resolve().parents[1] / "workflows" / "redcraft3_krea2_t2i_api.json"
 GOLDEN_PARAMS = {
     "prompt": "a rain-soaked neon alley at night, shot on a handheld camera",
     "width": 1024,
