@@ -133,6 +133,22 @@ def to_tensor(images: list[dict[str, Any]]) -> torch.Tensor:
     return torch.stack(frames)
 
 
+def from_tensor(images: torch.Tensor) -> list[str]:
+    """Encode a ComfyUI [B, H, W, C] float32 batch as base64 PNGs.
+
+    The inverse of `to_tensor`, for nodes that send an image *to* a deployment
+    rather than only receiving one. PNG because it is lossless: a reference
+    image is about to be VAE-encoded, and JPEG artefacts would be encoded too.
+    """
+    frames = []
+    for frame in images:
+        array = (frame.detach().cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+        buffer = io.BytesIO()
+        Image.fromarray(array).save(buffer, format="PNG", compress_level=4)
+        frames.append(base64.b64encode(buffer.getvalue()).decode("ascii"))
+    return frames
+
+
 class ProgressMirror:
     """Mirror a remote render's progress onto this node's local progress bar.
 

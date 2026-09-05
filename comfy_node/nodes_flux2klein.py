@@ -10,6 +10,7 @@ from ._runtime import (
     common_geometry_inputs,
     endpoint,
     endpoint_inputs,
+    from_tensor,
     geometry_payload,
     post,
     to_tensor,
@@ -93,7 +94,22 @@ class Flux2KleinModal:
                     },
                 ),
             },
-            "optional": endpoint_inputs(ENV_URL),
+            # Optional, so the node stays a pure source when nothing is wired in
+            # and every saved text-to-image workflow keeps working untouched.
+            "optional": {
+                "reference_image": (
+                    "IMAGE",
+                    {
+                        "tooltip": (
+                            "Connect an image to switch from text-to-image to "
+                            "image edit. The output size then follows the "
+                            "reference, not the width/height widgets. Not "
+                            "supported by the distilled variant."
+                        ),
+                    },
+                ),
+                **endpoint_inputs(ENV_URL),
+            },
             # Lets the progress bar attach to this node rather than the graph.
             "hidden": {"unique_id": "UNIQUE_ID"},
         }
@@ -121,6 +137,7 @@ class Flux2KleinModal:
         lora: str = "none",
         lora_strength: float = 1.0,
         override_lora_strength: bool = False,
+        reference_image=None,
         endpoint: str = "",
         timeout_s: float = 900.0,
         unique_id: str | None = None,
@@ -149,6 +166,12 @@ class Flux2KleinModal:
             # the same way omitting steps/cfg defers to the variant.
             if override_lora_strength:
                 payload["lora_strength"] = lora_strength
+        # An IMAGE input is a batch, and the server caps references at 4. Sending
+        # only what it accepts keeps a long batch from being rejected wholesale.
+        if reference_image is not None and len(reference_image):
+            payload["reference_images"] = from_tensor(reference_image[:4])
+            # The batch widget cannot apply once a reference fixes the size.
+            payload["batch_size"] = 1
 
         with ProgressMirror(url, client_id, unique_id):
             result = post(url, "/generate", payload, timeout_s)

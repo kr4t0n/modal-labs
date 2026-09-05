@@ -338,3 +338,141 @@ def test_every_registered_adapter_builds_a_valid_graph(lora):
     node = graph[workflow.LORA_NODE_ID]
     assert node["inputs"]["lora_name"] == workflow.LORAS[lora].filename
     assert graph["guider"]["inputs"]["model"] == [workflow.LORA_NODE_ID, 0]
+
+
+# --- Image edit -------------------------------------------------------------
+# Flattened from ComfyUI's `image_flux2_klein_image_edit_9b_base`. The graph
+# below is the same text-to-image one plus a reference chain, so the tests that
+# matter are the ones pinning what the template does differently.
+
+
+def edit_graph(names=("ref_0.png",), **kwargs):
+    return workflow.build_workflow(
+        workflow.resolve_params("edit this", reference_images=names, **kwargs)
+    )
+
+
+def test_no_references_leaves_the_graph_untouched():
+    """The whole feature must be invisible to text-to-image callers."""
+    graph = graph_for()
+    assert workflow.REFERENCE_ENCODE_NODE_ID not in graph
+    assert not any(n["class_type"] == "ReferenceLatent" for n in graph.values())
+    assert graph["guider"]["inputs"]["positive"] == ["positive", 0]
+    assert graph["guider"]["inputs"]["negative"] == ["negative", 0]
+
+
+def test_reference_is_loaded_scaled_and_encoded():
+    graph = edit_graph()
+    assert graph[f"{workflow.REFERENCE_SCALE_NODE_ID}_0"]["inputs"]["image"] == "ref_0.png"
+    scale = graph[workflow.REFERENCE_SCALE_NODE_ID]
+    assert scale["class_type"] == "ImageScaleToTotalPixels"
+    assert scale["inputs"]["upscale_method"] == "lanczos"
+    assert scale["inputs"]["megapixels"] == 1.0
+    encode = graph[workflow.REFERENCE_ENCODE_NODE_ID]
+    assert encode["class_type"] == "VAEEncode"
+    # Encoded from the *scaled* image, and against the graph's own VAE.
+    assert encode["inputs"]["pixels"] == [workflow.REFERENCE_SCALE_NODE_ID, 0]
+    assert encode["inputs"]["vae"] == ["load_vae", 0]
+
+
+def test_both_branches_receive_a_reference():
+    """The template wires ReferenceLatent into the negative branch too.
+
+    Wiring only the positive still renders, so nothing but this test would
+    notice the drift from the published recipe.
+    """
+    graph = edit_graph()
+    for branch, node_id in (
+        ("positive", workflow.REFERENCE_POSITIVE_NODE_ID),
+        ("negative", workflow.REFERENCE_NEGATIVE_NODE_ID),
+    ):
+        node = graph[node_id]
+        assert node["class_type"] == "ReferenceLatent"
+        assert node["inputs"]["conditioning"] == [branch, 0]
+        assert node["inputs"]["latent"] == [workflow.REFERENCE_ENCODE_NODE_ID, 0]
+        assert graph["guider"]["inputs"][branch] == [node_id, 0]
+
+
+def test_the_reference_sets_the_output_size():
+    """`GetImageSize` on the scaled reference drives both size consumers."""
+    graph = edit_graph(width=512, height=512)
+    for node_id in ("sigmas", "latent"):
+        assert graph[node_id]["inputs"]["width"] == [workflow.REFERENCE_SIZE_NODE_ID, 0]
+        assert graph[node_id]["inputs"]["height"] == [workflow.REFERENCE_SIZE_NODE_ID, 1]
+    assert graph[workflow.REFERENCE_SIZE_NODE_ID]["inputs"]["image"] == [
+        workflow.REFERENCE_SCALE_NODE_ID,
+        0,
+    ]
+
+
+def test_params_do_not_claim_a_size_they_did_not_apply():
+    """A caller reading params must not think width/height took effect."""
+    params = workflow.resolve_params("x", reference_images=("a.png",), width=512, height=512)
+    reported = params.as_dict()
+    assert reported["width"] is None and reported["height"] is None
+    assert reported["is_edit"] is True
+    assert reported["reference_images"] == ["a.png"]
+    # Text-to-image keeps reporting real numbers.
+    plain = workflow.resolve_params("x", width=512, height=512).as_dict()
+    assert plain["width"] == 512 and plain["is_edit"] is False
+
+
+def test_multiple_references_chain_per_branch():
+    graph = edit_graph(names=("a.png", "b.png", "c.png"))
+    encodes = [n for n, v in graph.items() if v["class_type"] == "VAEEncode"]
+    assert len(encodes) == 3
+    # Each branch chains one ReferenceLatent per reference, in series.
+    for node_id in (workflow.REFERENCE_POSITIVE_NODE_ID, workflow.REFERENCE_NEGATIVE_NODE_ID):
+        chain = [n for n in graph if n.startswith(node_id)]
+        assert len(chain) == 3
+    refs = [n for n, v in graph.items() if v["class_type"] == "ReferenceLatent"]
+    assert len(refs) == 6
+
+
+def test_only_the_first_reference_defines_the_geometry():
+    """Later references are conditioning only; they must not resize anything."""
+    graph = edit_graph(names=("a.png", "b.png"))
+    assert graph[workflow.REFERENCE_SIZE_NODE_ID]["inputs"]["image"] == [
+        workflow.REFERENCE_SCALE_NODE_ID,
+        0,
+    ]
+    assert sum(v["class_type"] == "GetImageSize" for v in graph.values()) == 1
+
+
+def test_reference_megapixels_reaches_every_scaler():
+    graph = edit_graph(names=("a.png", "b.png"), reference_megapixels=2.5)
+    scalers = [v for v in graph.values() if v["class_type"] == "ImageScaleToTotalPixels"]
+    assert scalers and all(s["inputs"]["megapixels"] == 2.5 for s in scalers)
+
+
+def test_editing_composes_with_a_lora():
+    graph = edit_graph(lora="snofs-v1.4")
+    assert graph["guider"]["inputs"]["model"] == [workflow.LORA_NODE_ID, 0]
+    assert graph["guider"]["inputs"]["positive"] == [workflow.REFERENCE_POSITIVE_NODE_ID, 0]
+
+
+def test_every_link_resolves_when_editing():
+    graph = edit_graph(names=("a.png", "b.png"))
+    for node_id, node in graph.items():
+        for name, value in node["inputs"].items():
+            if isinstance(value, list) and value and isinstance(value[0], str):
+                assert value[0] in graph, f"{node_id}.{name} -> missing {value[0]!r}"
+
+
+def test_the_distilled_variant_refuses_to_edit():
+    """No upstream edit template exists for it; it would render something else."""
+    with pytest.raises(workflow.WorkflowError, match="distilled"):
+        workflow.resolve_params("x", variant="distilled", reference_images=("a.png",))
+
+
+def test_editing_refuses_a_batch():
+    """The reference fixes one output size, so a batch is N copies of one edit."""
+    with pytest.raises(workflow.WorkflowError, match="batch_size"):
+        workflow.resolve_params("x", reference_images=("a.png",), batch_size=2)
+
+
+def test_uncensored_variant_may_edit():
+    """It is the base transformer with a different encoder, so the recipe holds."""
+    graph = edit_graph(variant="ponpoke-uncensored")
+    assert graph["load_unet"]["inputs"]["unet_name"] == "flux-2-klein-base-9b-fp8.safetensors"
+    assert graph["guider"]["inputs"]["positive"] == [workflow.REFERENCE_POSITIVE_NODE_ID, 0]

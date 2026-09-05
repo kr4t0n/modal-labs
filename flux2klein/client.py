@@ -6,6 +6,7 @@ export MODAL_KEY=wk-...  MODAL_SECRET=ws-...
 
 ./client.py generate "a neon ramen shop in the rain" --aspect-ratio 16:9
 ./client.py generate "a portrait" --variant distilled      # 4 steps, cfg 1
+./client.py generate "make it night" --reference photo.png # image edit
 ./client.py variants
 ./client.py validate
 ./client.py health
@@ -13,6 +14,7 @@ export MODAL_KEY=wk-...  MODAL_SECRET=ws-...
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
 from pathlib import Path
@@ -45,6 +47,18 @@ def main() -> None:
     )
     gen.add_argument("--steps", type=int, help="overrides the variant default")
     gen.add_argument("--cfg", type=float, help="overrides the variant default")
+    gen.add_argument(
+        "--reference",
+        action="append",
+        metavar="PATH",
+        help="image to edit from; repeat for up to 4. Output size follows the first",
+    )
+    gen.add_argument(
+        "--reference-megapixels",
+        type=float,
+        default=1.0,
+        help="each reference is scaled to this before encoding (default 1.0)",
+    )
     cli.add_geometry_arguments(gen, workflow.ASPECT_RATIOS)
 
     subparsers.add_parser("variants", help="list variants and their sampler defaults")
@@ -78,6 +92,13 @@ def main() -> None:
         payload["steps"] = args.steps
     if args.cfg is not None:
         payload["cfg"] = args.cfg
+    # Supplying any reference turns this into an edit; the server then takes the
+    # output size from the first one and ignores the geometry flags above.
+    if args.reference:
+        payload["reference_images"] = [
+            base64.b64encode(Path(path).read_bytes()).decode("ascii") for path in args.reference
+        ]
+        payload["reference_megapixels"] = args.reference_megapixels
 
     result = cli.generate(url, payload, args.out, args.timeout)
     params = result["params"]

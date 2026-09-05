@@ -137,3 +137,91 @@ async def test_variants_endpoint_reports_trigger_words(wired):
     _, client, _ = wired
     body = (await client.get("/variants")).json()
     assert body["loras"]["realstockings-v2"]["trigger_words"] == ["stockings", "RealStockings"]
+
+
+# --- Image edit -------------------------------------------------------------
+# References arrive as base64 and have to exist in ComfyUI's input directory
+# before the graph can name them, so the shared layer uploads them first and
+# swaps the field for the filenames ComfyUI reports back.
+
+REFERENCE_B64 = base64.b64encode(PNG).decode("ascii")
+
+
+@pytest.mark.asyncio
+async def test_a_reference_is_uploaded_and_named_in_the_graph(wired):
+    _, client, state = wired
+    response = await client.post(
+        "/generate", json={"prompt": "make it night", "reference_images": [REFERENCE_B64]}
+    )
+    assert response.status_code == 200, response.text
+
+    # The bytes actually reached ComfyUI's upload endpoint...
+    assert state.get("uploaded")
+    # ...and the graph references the name ComfyUI returned, not the one sent.
+    graph = state["prompts"][0]["prompt"]
+    loaders = [n for n in graph.values() if n["class_type"] == "LoadImage"]
+    assert len(loaders) == 1
+    assert loaders[0]["inputs"]["image"] == "uploaded.png"
+
+
+@pytest.mark.asyncio
+async def test_editing_rewires_both_conditioning_branches(wired):
+    _, client, state = wired
+    await client.post(
+        "/generate", json={"prompt": "make it night", "reference_images": [REFERENCE_B64]}
+    )
+    guider = state["prompts"][0]["prompt"]["guider"]["inputs"]
+    assert guider["positive"] == [workflow.REFERENCE_POSITIVE_NODE_ID, 0]
+    assert guider["negative"] == [workflow.REFERENCE_NEGATIVE_NODE_ID, 0]
+
+
+@pytest.mark.asyncio
+async def test_no_references_uploads_nothing(wired):
+    """Text-to-image must not gain a network round trip from this feature."""
+    _, client, state = wired
+    await client.post("/generate", json={"prompt": "a test"})
+    assert "uploaded" not in state
+    assert not any(n["class_type"] == "LoadImage" for n in state["prompts"][0]["prompt"].values())
+
+
+@pytest.mark.asyncio
+async def test_reported_params_admit_the_size_came_from_the_reference(wired):
+    _, client, _ = wired
+    response = await client.post(
+        "/generate",
+        json={"prompt": "x", "reference_images": [REFERENCE_B64], "width": 512, "height": 512},
+    )
+    params = response.json()["params"]
+    assert params["is_edit"] is True
+    assert params["width"] is None and params["height"] is None
+
+
+@pytest.mark.asyncio
+async def test_malformed_base64_is_rejected_before_any_render(wired):
+    _, client, state = wired
+    response = await client.post(
+        "/generate", json={"prompt": "x", "reference_images": ["not base64 at all!!"]}
+    )
+    assert response.status_code == 422
+    assert state["prompts"] == [], "nothing should have been queued"
+
+
+@pytest.mark.asyncio
+async def test_empty_reference_is_rejected(wired):
+    _, client, _ = wired
+    response = await client.post("/generate", json={"prompt": "x", "reference_images": [""]})
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_distilled_cannot_edit_over_the_api(wired):
+    _, client, _ = wired
+    response = await client.post(
+        "/generate",
+        json={
+            "prompt": "x",
+            "variant": "distilled",
+            "reference_images": [REFERENCE_B64],
+        },
+    )
+    assert response.status_code == 422

@@ -163,6 +163,49 @@ integrity guarantee of its own.
 > deployment is a judgement call; anything multi-user or public needs a paid
 > licence from the author. The other weights here are unaffected.
 
+## Image editing
+
+Supply one or more reference images and the service switches from text-to-image
+to **image edit**: the reference conditions generation, and the prompt says what
+to change.
+
+```bash
+uv run python client.py generate "make it night, keep the composition" \
+  --reference photo.png
+```
+
+Or over the API, base64-encoded:
+
+```json
+{"prompt": "make it night", "reference_images": ["iVBORw0KGgo..."]}
+```
+
+In ComfyUI, connect anything producing an `IMAGE` to the node's optional
+`reference_image` input. Leaving it unconnected keeps the node text-to-image, so
+saved workflows are unaffected.
+
+Flattened from ComfyUI's `image_flux2_klein_image_edit_9b_base` template — same
+checkpoint, encoder and VAE this service already serves, so **no extra weights
+and no re-run of `download_models`**. Only `modal deploy` is needed.
+
+Four things behave differently once a reference is present, all of them the
+template's doing rather than ours:
+
+- **The reference sets the output size.** `width`, `height` and `aspect_ratio`
+  are ignored; the first reference is scaled to `reference_megapixels` and its
+  dimensions drive the render. The response reports `width`/`height` as `null`
+  and `is_edit: true` rather than echoing values that were never applied.
+- **`batch_size` must be 1.** One reference fixes one output size, so a batch
+  would be N copies of the same edit. Anything else is a 422.
+- **The `distilled` variant is refused.** Upstream publishes no edit recipe for
+  it. It would render something; there is no reason to think it is the edit you
+  asked for. Use `base` or `ponpoke-uncensored`.
+- **Up to 4 references chain.** Later ones add conditioning only — the first
+  alone defines the geometry.
+
+Editing composes with `lora`, and with `ponpoke-uncensored` (that variant is the
+base transformer with a different text encoder, so the recipe still holds).
+
 ## Using it from ComfyUI
 
 ```bash
@@ -212,7 +255,9 @@ uv run modal run app.py --prompt "a brutalist library at golden hour" --variant 
 | `megapixels` | 1.0 | Pixel budget used with `aspect_ratio` |
 | `steps`, `cfg` | variant | Explicit overrides |
 | `seed` | random | 0 – 2^64-1 |
-| `batch_size` | 1 | 1–8 |
+| `batch_size` | 1 | 1–8; must be 1 when editing |
+| `reference_images` | `[]` | Base64 images to edit from, max 4. See [Image editing](#image-editing) |
+| `reference_megapixels` | 1.0 | Each reference is scaled to this before encoding |
 | `sampler_name` | `euler` | Any ComfyUI sampler |
 | `timeout_s` | 900 | Server-side wait |
 | `client_id` | generated | Subscribe to `/ws?clientId=<id>` for this render's progress |
