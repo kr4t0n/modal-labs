@@ -204,7 +204,34 @@ def test_widget_names_and_order_are_stable(node_id, expected):
     schema = comfy_node.NODE_CLASS_MAPPINGS[node_id].INPUT_TYPES()
     assert list(schema["required"]) == expected
     assert schema["hidden"] == {"unique_id": "UNIQUE_ID"}
-    assert set(schema["optional"]) == {"endpoint", "timeout_s"}
+    # Transport is on every node; a node may add its own optional inputs beyond
+    # it, which is how klein takes a reference image without disturbing others.
+    assert {"endpoint", "timeout_s"} <= set(schema["optional"])
+
+
+@pytest.mark.parametrize(
+    ("node_id", "extra"),
+    [
+        ("Flux2KleinModal", {"reference_image"}),
+        ("UltraModal", set()),
+        ("ZImageTurboStableYogiModal", set()),
+        ("FinePornV4Modal", set()),
+        ("RedGPT2GPTModal", set()),
+        ("RedCraft3Modal", set()),
+        ("DarkBeast3Modal", set()),
+    ],
+)
+def test_optional_inputs_beyond_transport_are_pinned(node_id, extra):
+    """An accidental optional input is a silently changed node contract."""
+    schema = comfy_node.NODE_CLASS_MAPPINGS[node_id].INPUT_TYPES()
+    assert set(schema["optional"]) - {"endpoint", "timeout_s"} == extra
+
+
+def test_the_klein_reference_input_is_an_optional_image():
+    """Optional and IMAGE-typed: a saved text-to-image workflow must still load."""
+    schema = comfy_node.NODE_CLASS_MAPPINGS["Flux2KleinModal"].INPUT_TYPES()
+    assert schema["optional"]["reference_image"][0] == "IMAGE"
+    assert "reference_image" not in schema["required"]
 
 
 def test_nodes_return_an_image_seed_and_info():
@@ -483,3 +510,86 @@ def test_shared_geometry_defaults_are_unchanged_for_other_nodes():
         assert widgets["width"][1]["default"] == 1024
         assert widgets["height"][1]["default"] == 1024
         assert widgets["megapixels"][1]["default"] == 1.0
+
+
+# --- Reference images -------------------------------------------------------
+# `from_tensor` does real pixel work, but numpy/torch are container-only in this
+# repo (see the root AGENTS.md on the thin local environment), so its encoding
+# is not exercised here. What *is* pinned is the wiring around it: what the node
+# puts in the payload, and when.
+
+
+class FakeBatch(list):
+    """Enough of an IMAGE batch for the node: length and slicing."""
+
+    def __getitem__(self, item):
+        result = list.__getitem__(self, item)
+        return FakeBatch(result) if isinstance(item, slice) else result
+
+
+def drive_klein(monkeypatch, **overrides):
+    """Run the klein node against a stubbed transport and return the payload."""
+    sent = {}
+    node = comfy_node.NODE_CLASS_MAPPINGS["Flux2KleinModal"]()
+    monkeypatch.setattr(
+        comfy_node.nodes_flux2klein,
+        "from_tensor",
+        lambda batch: [f"b64-{i}" for i in range(len(batch))],
+    )
+    monkeypatch.setattr(comfy_node.nodes_flux2klein, "to_tensor", lambda images: "TENSOR")
+    monkeypatch.setattr(
+        comfy_node.nodes_flux2klein,
+        "ProgressMirror",
+        lambda *a, **k: contextlib.nullcontext(),
+    )
+    monkeypatch.setattr(
+        comfy_node.nodes_flux2klein,
+        "post",
+        lambda url, path, payload, timeout: (
+            sent.update(payload) or {"images": [], "params": {"seed": 1}}
+        ),
+    )
+    kwargs = dict(
+        prompt="p",
+        negative_prompt="",
+        variant="base",
+        aspect_ratio="custom",
+        megapixels=1.0,
+        width=1024,
+        height=1024,
+        batch_size=3,
+        seed=0,
+        override_sampler=False,
+        steps=20,
+        cfg=5.0,
+        endpoint="https://x.modal.run",
+    )
+    kwargs.update(overrides)
+    node.generate(**kwargs)
+    return sent
+
+
+def test_no_reference_leaves_the_payload_text_to_image(monkeypatch):
+    payload = drive_klein(monkeypatch)
+    assert "reference_images" not in payload
+    assert payload["batch_size"] == 3, "the batch widget still applies"
+
+
+def test_a_reference_switches_the_payload_to_an_edit(monkeypatch):
+    payload = drive_klein(monkeypatch, reference_image=FakeBatch(["frame"]))
+    assert payload["reference_images"] == ["b64-0"]
+    # A reference fixes the output size, so the batch widget cannot apply.
+    assert payload["batch_size"] == 1
+
+
+def test_an_empty_batch_is_not_treated_as_a_reference(monkeypatch):
+    """An IMAGE input can be wired but empty; that is still text-to-image."""
+    payload = drive_klein(monkeypatch, reference_image=FakeBatch([]))
+    assert "reference_images" not in payload
+    assert payload["batch_size"] == 3
+
+
+def test_references_are_capped_at_the_servers_limit(monkeypatch):
+    """The server rejects more than 4; sending 5 would fail the whole render."""
+    payload = drive_klein(monkeypatch, reference_image=FakeBatch(["a", "b", "c", "d", "e", "f"]))
+    assert len(payload["reference_images"]) == 4

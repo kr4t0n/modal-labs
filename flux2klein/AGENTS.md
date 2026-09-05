@@ -109,12 +109,59 @@ whichever project was collected first. That is why the guard test exists.
 
 CI imports each `app.py` in a separate process for the same reason.
 
+## Image edit: what the template does that is easy to lose
+
+Flattened from `image_flux2_klein_image_edit_9b_base`, which loads the same
+checkpoint, encoder and VAE this service already serves — hence no new weights.
+The emitted graph was diffed node-for-node against that template.
+
+Four properties are load-bearing and none of them fail loudly if dropped:
+
+**Both branches get a reference.** The template chains a `ReferenceLatent` into
+the *negative* conditioning as well as the positive. Wiring only the positive
+still renders, just off-recipe, so a test pins both.
+
+**The reference sets the geometry.** `GetImageSize` on the *scaled* reference
+drives `Flux2Scheduler` and `EmptyFlux2LatentImage`, overriding whatever the
+caller asked for. `GenerationParams.as_dict` therefore reports `width`/`height`
+as `None` on an edit: echoing numbers that were never applied would make the
+`params` block lie, and that block is what callers log.
+
+**Only the first reference defines geometry.** Later ones are conditioning only.
+There is exactly one `GetImageSize` in the graph, and a test asserts it.
+
+**Scaling comes before encoding.** `ImageScaleToTotalPixels` normalises to
+`reference_megapixels` first, and `VAEEncode` takes the *scaled* image. Encoding
+the raw one would blow up the latent for a large input.
+
+Two refusals are deliberate rather than missing features. `distilled` has no
+upstream edit template, so editing with it is rejected rather than allowed to
+render something plausible. And `batch_size > 1` is rejected because the
+reference fixes one output size.
+
+## How an image reaches ComfyUI
+
+`LoadImage` names a file in ComfyUI's input directory, so bytes have to get
+there before the graph can reference them. `ModelService.upload_fields` names
+the request fields carrying base64; `run_generation` uploads each through
+ComfyUI's own `/upload/image` and **replaces the field with the returned
+filenames** before `resolve` runs. So a resolver reads filenames where the
+caller wrote base64 — the one piece of sleight of hand here, and the reason
+`resolve` kept its single-argument signature instead of every service changing.
+
+Always use the name ComfyUI reports back, never the one sent: it renames on
+collision, and referencing the sent name would silently load someone else's
+image.
+
+Uploads happen before the `duration_s` clock starts. They are transport, not
+render time, and a service with no `upload_fields` makes no extra call at all.
+
 ## Known gaps
 
-- Text-to-image only. FLUX.2 klein also does image editing, and ComfyUI ships
-  templates for it (`image_flux2_klein_image_edit_9b_*`); that needs
-  `/upload/image` plumbing in the typed contract. The raw proxy already exposes
-  the endpoint, so the graph is reachable today by posting to `/prompt` directly.
+- `from_tensor` in the node package encodes an `IMAGE` batch to base64 PNG, but
+  `numpy`/`torch` are container-only in this repo's thin local environment, so
+  only its wiring is tested, never its pixels. A real render through the node is
+  the first genuine exercise of it.
 - The 4B variants are not wired up. They use a different text encoder
   (`qwen_3_4b`), which the pairing comment in `workflow.py` deliberately fixes
   to the 8B one — mixing encoder and transformer scales degrades output silently.

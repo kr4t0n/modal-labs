@@ -56,6 +56,26 @@ class GenerateRequest(BaseGenerateRequest):
 
     filename_prefix: str = "flux2-klein"
 
+    # Base64 on the way in; the shared layer uploads each to ComfyUI and
+    # replaces this with the input-directory filenames before `_resolve` runs.
+    # Declared in `upload_fields` below, which is what performs that swap.
+    reference_images: list[str] = Field(
+        default_factory=list,
+        max_length=4,
+        description=(
+            "Base64-encoded images to edit from. Supplying any turns this into "
+            "an image edit: the output size is taken from the first reference "
+            "rather than width/height, and batch_size must be 1. Not supported "
+            "on the distilled variant."
+        ),
+    )
+    reference_megapixels: float = Field(
+        default=1.0,
+        ge=0.01,
+        le=16.0,
+        description="Each reference is scaled to this budget before encoding. Ignored with none.",
+    )
+
 
 def _resolve(request: GenerateRequest) -> workflow.GenerationParams:
     width, height = request.dimensions()
@@ -73,6 +93,9 @@ def _resolve(request: GenerateRequest) -> workflow.GenerationParams:
         cfg=request.cfg,
         sampler_name=request.sampler_name,
         filename_prefix=request.filename_prefix,
+        # Filenames by now, not base64 — see `upload_fields`.
+        reference_images=request.reference_images,
+        reference_megapixels=request.reference_megapixels,
     )
 
 
@@ -83,6 +106,7 @@ SERVICE = ModelService(
     resolve=_resolve,
     build_workflow=workflow.build_workflow,
     output_node_id=workflow.OUTPUT_NODE_ID,
+    upload_fields=("reference_images",),
 )
 
 

@@ -119,6 +119,16 @@ verbatim.
 > use the recommended strength rather than the 1.0 they used to send. Turn it on
 > to restore the old behaviour exactly.
 
+`reference_image` is an **optional** `IMAGE` input. Connect anything producing
+an image and the node switches from text-to-image to **image edit** — the
+reference conditions the render and the prompt says what to change. Leave it
+unconnected and nothing changes, so saved workflows keep working.
+
+Three things shift once it is connected: the output size follows the reference
+rather than the width/height widgets, `batch_size` is forced to 1, and the
+`distilled` variant is rejected by the server (no upstream edit recipe exists
+for it). An input batch longer than 4 is truncated, which is the server's limit.
+
 **WAI-illustrious (Modal)** → `IMAGE`, `INT` (seed), `STRING` (info)
 
 Danbooru tags rather than prose: `1girl, solo, silver hair, masterpiece`. Full

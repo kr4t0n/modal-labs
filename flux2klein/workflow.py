@@ -20,6 +20,7 @@ prompt rather than zeroed-out conditioning.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -234,9 +235,25 @@ class GenerationParams:
     cfg: float
     sampler_name: str
     filename_prefix: str
+    # ComfyUI input-directory filenames, already uploaded. Empty is plain
+    # text-to-image; anything else makes this an edit.
+    reference_images: tuple[str, ...] = ()
+    reference_megapixels: float = 1.0
+
+    @property
+    def is_edit(self) -> bool:
+        return bool(self.reference_images)
 
     def as_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        data["reference_images"] = list(self.reference_images)
+        data["is_edit"] = self.is_edit
+        if self.is_edit:
+            # Honesty over tidiness: on an edit the graph takes its size from
+            # GetImageSize on the scaled reference, so these were never applied
+            # and reporting them as though they were would be a lie.
+            data["width"] = data["height"] = None
+        return data
 
 
 def resolve_params(
@@ -256,6 +273,8 @@ def resolve_params(
     cfg: float | None = None,
     sampler_name: str = "euler",
     filename_prefix: str = "flux2-klein",
+    reference_images: Sequence[str] = (),
+    reference_megapixels: float = 1.0,
 ) -> GenerationParams:
     """Apply the variant's defaults and snap dimensions; explicit values win."""
     if not prompt or not prompt.strip():
@@ -266,6 +285,19 @@ def resolve_params(
         raise WorkflowError("batch_size must be at least 1")
     if lora is not None and lora not in LORAS:
         raise WorkflowError(f"unknown lora {lora!r}; expected one of {sorted(LORAS)}")
+    if not 0.01 <= reference_megapixels <= 16.0:
+        raise WorkflowError("reference_megapixels must be between 0.01 and 16")
+    if reference_images and batch_size != 1:
+        # The edit graph sizes its latent from the reference, so a batch would
+        # be N copies of one edit at one size. Refuse rather than surprise.
+        raise WorkflowError("batch_size must be 1 when editing; references fix the output size")
+    if reference_images and variant == "distilled":
+        # The distilled checkpoint has no published edit template, unlike base.
+        # It would run and return something; there is no reason to believe it
+        # is the edit that was asked for.
+        raise WorkflowError(
+            "the distilled variant has no image-edit recipe upstream; use base or ponpoke-uncensored"
+        )
 
     spec = VARIANTS[variant]
     resolved_steps = int(steps if steps is not None else spec.steps)
@@ -298,6 +330,8 @@ def resolve_params(
         cfg=float(cfg if cfg is not None else spec.cfg),
         sampler_name=sampler_name,
         filename_prefix=filename_prefix,
+        reference_images=tuple(reference_images),
+        reference_megapixels=float(reference_megapixels),
     )
 
 
@@ -305,6 +339,22 @@ OUTPUT_NODE_ID = "save_image"
 
 
 LORA_NODE_ID = "load_lora"
+
+# --- Image edit -------------------------------------------------------------
+# Node ids for the reference chain, spliced in only when references are given.
+# Flattened from ComfyUI's `image_flux2_klein_image_edit_9b_base` template.
+REFERENCE_SCALE_NODE_ID = "reference_scale"
+REFERENCE_ENCODE_NODE_ID = "reference_encode"
+REFERENCE_SIZE_NODE_ID = "reference_size"
+# One per branch: the template feeds a ReferenceLatent into *both* the positive
+# and the negative conditioning, not just the positive.
+REFERENCE_POSITIVE_NODE_ID = "reference_positive"
+REFERENCE_NEGATIVE_NODE_ID = "reference_negative"
+
+# The template normalises every reference to 1 MP before encoding, and lanczos
+# is what it uses. `megapixels` is caller-settable; the method is not, because
+# nothing upstream suggests another and it is not a knob users ask for.
+REFERENCE_UPSCALE_METHOD = "lanczos"
 
 
 def build_workflow(params: GenerationParams) -> dict[str, Any]:
@@ -423,4 +473,102 @@ def build_workflow(params: GenerationParams) -> dict[str, Any]:
             "_meta": {"title": f"LoRA: {params.lora}"},
         }
 
+    if params.is_edit:
+        _splice_reference_chain(graph, params)
+
     return graph
+
+
+def _splice_reference_chain(graph: dict[str, Any], params: GenerationParams) -> None:
+    """Turn the text-to-image graph into the official image-edit one, in place.
+
+    Flattened from `image_flux2_klein_image_edit_9b_base`. Three things about it
+    are easy to get wrong and are therefore spelled out:
+
+    * **The reference sets the output size.** `GetImageSize` on the *scaled*
+      reference drives both the scheduler and the empty latent, so whatever
+      width/height the caller asked for is overwritten here. That is the
+      template's behaviour, and it is why `as_dict` reports them as None.
+    * **Both branches get a reference.** The template chains a `ReferenceLatent`
+      into the negative conditioning as well as the positive. Wiring only the
+      positive renders, and drifts from the recipe in a way nothing would catch.
+    * **Multiple references chain.** `ReferenceLatent` takes one latent, so N
+      references means N nodes in series per branch, each appending to the
+      conditioning.
+    """
+    first, *rest = params.reference_images
+
+    graph[f"{REFERENCE_SCALE_NODE_ID}_0"] = {
+        "class_type": "LoadImage",
+        "inputs": {"image": first},
+        "_meta": {"title": "Reference image"},
+    }
+    graph[REFERENCE_SCALE_NODE_ID] = {
+        "class_type": "ImageScaleToTotalPixels",
+        "inputs": {
+            "image": [f"{REFERENCE_SCALE_NODE_ID}_0", 0],
+            "upscale_method": REFERENCE_UPSCALE_METHOD,
+            "megapixels": params.reference_megapixels,
+            "resolution_steps": 1,
+        },
+        "_meta": {"title": "Normalise reference"},
+    }
+    graph[REFERENCE_SIZE_NODE_ID] = {
+        "class_type": "GetImageSize",
+        "inputs": {"image": [REFERENCE_SCALE_NODE_ID, 0]},
+        "_meta": {"title": "Reference size"},
+    }
+    graph[REFERENCE_ENCODE_NODE_ID] = {
+        "class_type": "VAEEncode",
+        "inputs": {"pixels": [REFERENCE_SCALE_NODE_ID, 0], "vae": ["load_vae", 0]},
+        "_meta": {"title": "Encode reference"},
+    }
+
+    # The reference, not the request, now decides the canvas.
+    for node_id in ("sigmas", "latent"):
+        graph[node_id]["inputs"]["width"] = [REFERENCE_SIZE_NODE_ID, 0]
+        graph[node_id]["inputs"]["height"] = [REFERENCE_SIZE_NODE_ID, 1]
+
+    # Any further references get their own load/scale/encode, sharing the size
+    # of the first — only the first reference defines the output geometry.
+    encodes = [REFERENCE_ENCODE_NODE_ID]
+    for index, name in enumerate(rest, start=1):
+        load_id = f"{REFERENCE_SCALE_NODE_ID}_{index}"
+        scale_id = f"{REFERENCE_SCALE_NODE_ID}_scaled_{index}"
+        encode_id = f"{REFERENCE_ENCODE_NODE_ID}_{index}"
+        graph[load_id] = {
+            "class_type": "LoadImage",
+            "inputs": {"image": name},
+            "_meta": {"title": f"Reference image {index + 1}"},
+        }
+        graph[scale_id] = {
+            "class_type": "ImageScaleToTotalPixels",
+            "inputs": {
+                "image": [load_id, 0],
+                "upscale_method": REFERENCE_UPSCALE_METHOD,
+                "megapixels": params.reference_megapixels,
+                "resolution_steps": 1,
+            },
+            "_meta": {"title": f"Normalise reference {index + 1}"},
+        }
+        graph[encode_id] = {
+            "class_type": "VAEEncode",
+            "inputs": {"pixels": [scale_id, 0], "vae": ["load_vae", 0]},
+            "_meta": {"title": f"Encode reference {index + 1}"},
+        }
+        encodes.append(encode_id)
+
+    for branch, node_id in (
+        ("positive", REFERENCE_POSITIVE_NODE_ID),
+        ("negative", REFERENCE_NEGATIVE_NODE_ID),
+    ):
+        source = [branch, 0]
+        for index, encode_id in enumerate(encodes):
+            chain_id = node_id if index == 0 else f"{node_id}_{index}"
+            graph[chain_id] = {
+                "class_type": "ReferenceLatent",
+                "inputs": {"conditioning": source, "latent": [encode_id, 0]},
+                "_meta": {"title": f"Reference -> {branch}"},
+            }
+            source = [chain_id, 0]
+        graph["guider"]["inputs"][branch] = source

@@ -130,6 +130,59 @@ class ModelService:
     build_workflow: Callable[[Any], dict[str, Any]]
     # Which node in the emitted graph carries the images in /history.
     output_node_id: str
+    # Names of request fields carrying base64 images that must reach ComfyUI's
+    # input directory before the graph can name them. Each is uploaded and the
+    # field is *replaced* with the returned filenames before `resolve` runs, so
+    # a resolver reads filenames where the caller wrote base64. Empty for every
+    # text-to-image service, which is why `resolve` keeps its one-argument shape.
+    upload_fields: tuple[str, ...] = ()
+
+
+async def upload_image(client: httpx.AsyncClient, data: bytes, filename: str) -> str:
+    """Put an image in ComfyUI's input directory; return the name LoadImage takes.
+
+    ComfyUI may rename on collision, so the name it reports back is the only one
+    safe to reference — never the one that was sent.
+    """
+    response = await client.post(
+        "/upload/image",
+        files={"image": (filename, data, "image/png")},
+        data={"overwrite": "false"},
+    )
+    if response.status_code >= 400:
+        raise HTTPException(response.status_code, {"comfyui_upload_error": response.text[:2000]})
+    body = response.json()
+    name = body.get("name")
+    if not name:
+        raise HTTPException(502, f"ComfyUI accepted an upload but named no file: {body}")
+    # Uploads land in a subfolder when one is used; LoadImage wants the pair
+    # joined, which is how ComfyUI's own frontend references them.
+    subfolder = body.get("subfolder") or ""
+    return f"{subfolder}/{name}" if subfolder else name
+
+
+async def _upload_request_images(
+    client: httpx.AsyncClient, request: BaseGenerateRequest, service: ModelService
+) -> BaseGenerateRequest:
+    """Swap base64 payloads for ComfyUI filenames on every declared upload field."""
+    if not service.upload_fields:
+        return request
+
+    replacements: dict[str, Any] = {}
+    for field in service.upload_fields:
+        payloads = getattr(request, field, None) or []
+        names = []
+        for index, payload in enumerate(payloads):
+            try:
+                data = base64.b64decode(payload, validate=True)
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(422, f"{field}[{index}] is not valid base64") from exc
+            if not data:
+                raise HTTPException(422, f"{field}[{index}] decoded to an empty file")
+            names.append(await upload_image(client, data, f"{field}_{index}.png"))
+        replacements[field] = names
+
+    return request.model_copy(update=replacements)
 
 
 def comfy_client(comfy_url: str) -> httpx.AsyncClient:
@@ -228,6 +281,9 @@ async def run_generation(
     client: httpx.AsyncClient, request: BaseGenerateRequest, service: ModelService
 ) -> GenerateResponse:
     """Queue the graph, wait for it, and collect the images."""
+    # Before the clock starts: uploads are transport, not render time, and a
+    # service with no upload fields does not touch the network here at all.
+    request = await _upload_request_images(client, request, service)
     params = resolve_params(service, request)
     started = time.monotonic()
     prompt_id = await _submit(client, service.build_workflow(params), request.client_id)
