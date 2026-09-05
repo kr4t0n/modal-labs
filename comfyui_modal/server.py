@@ -161,28 +161,44 @@ async def upload_image(client: httpx.AsyncClient, data: bytes, filename: str) ->
     return f"{subfolder}/{name}" if subfolder else name
 
 
+def _decode_upload(payload: str, label: str) -> bytes:
+    try:
+        data = base64.b64decode(payload, validate=True)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(422, f"{label} is not valid base64") from exc
+    if not data:
+        raise HTTPException(422, f"{label} decoded to an empty file")
+    return data
+
+
 async def _upload_request_images(
     client: httpx.AsyncClient, request: BaseGenerateRequest, service: ModelService
 ) -> BaseGenerateRequest:
-    """Swap base64 payloads for ComfyUI filenames on every declared upload field."""
+    """Swap base64 payloads for ComfyUI filenames on every declared upload field.
+
+    A field may be a single image or a list of them — img2img takes exactly one
+    source, while an edit model may accept several references — so the shape of
+    the field is preserved rather than forced into a list.
+    """
     if not service.upload_fields:
         return request
 
     replacements: dict[str, Any] = {}
     for field in service.upload_fields:
-        payloads = getattr(request, field, None) or []
+        payload = getattr(request, field, None)
+        if payload is None or payload == "" or payload == []:
+            continue
+        if isinstance(payload, str):
+            data = _decode_upload(payload, field)
+            replacements[field] = await upload_image(client, data, f"{field}.png")
+            continue
         names = []
-        for index, payload in enumerate(payloads):
-            try:
-                data = base64.b64decode(payload, validate=True)
-            except (ValueError, TypeError) as exc:
-                raise HTTPException(422, f"{field}[{index}] is not valid base64") from exc
-            if not data:
-                raise HTTPException(422, f"{field}[{index}] decoded to an empty file")
+        for index, item in enumerate(payload):
+            data = _decode_upload(item, f"{field}[{index}]")
             names.append(await upload_image(client, data, f"{field}_{index}.png"))
         replacements[field] = names
 
-    return request.model_copy(update=replacements)
+    return request.model_copy(update=replacements) if replacements else request
 
 
 def comfy_client(comfy_url: str) -> httpx.AsyncClient:

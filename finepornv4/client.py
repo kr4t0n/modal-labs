@@ -13,6 +13,7 @@ export MODAL_KEY=wk-...  MODAL_SECRET=ws-...
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
 from pathlib import Path
@@ -38,6 +39,23 @@ def main() -> None:
     gen.add_argument("--scheduler", default=workflow.DEFAULT_SCHEDULER)
     # Not the shared 1024/1.0: this merge is tuned above 1 MP, and the payload
     # always carries width/height, so leaving these would override the server.
+    gen.add_argument(
+        "--denoise",
+        type=float,
+        default=1.0,
+        help="only meaningful with --source; 1.0 ignores the source entirely",
+    )
+    gen.add_argument(
+        "--source",
+        metavar="PATH",
+        help="image to start from (img2img); output size follows it, not --width/--height",
+    )
+    gen.add_argument(
+        "--source-megapixels",
+        type=float,
+        default=1.0,
+        help="the source is scaled to this before encoding (default 1.0)",
+    )
     cli.add_geometry_arguments(
         gen,
         workflow.ASPECT_RATIOS,
@@ -72,13 +90,23 @@ def main() -> None:
     # Left unset, the server applies its own default negative.
     if args.negative is not None:
         payload["negative_prompt"] = args.negative
+    # Supplying a source turns this into img2img; the server then takes the
+    # output size from it and `--denoise` starts mattering.
+    if args.source:
+        payload["source_image"] = base64.b64encode(Path(args.source).read_bytes()).decode("ascii")
+        payload["source_megapixels"] = args.source_megapixels
+        payload["denoise"] = args.denoise
 
     result = cli.generate(url, payload, args.out, args.timeout)
     params = result["params"]
+    if params.get("is_img2img"):
+        size = f"from source at denoise {params['denoise']}"
+    else:
+        size = f"{params['width']}x{params['height']}"
     print(
         f"seed={params['seed']} steps={params['steps']} cfg={params['cfg']} "
         f"{params['sampler_name']}/{params['scheduler']} "
-        f"{params['width']}x{params['height']} in {result['duration_s']}s"
+        f"{size} in {result['duration_s']}s"
     )
     return None
 

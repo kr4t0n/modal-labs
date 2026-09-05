@@ -10,9 +10,12 @@ in one place.
 from __future__ import annotations
 
 import base64
+import contextlib
 import gzip
+import importlib
 import sys
 import types
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -128,3 +131,24 @@ def wire(service_app: FastAPI, upstream: FastAPI) -> httpx.AsyncClient:
         transport=httpx.ASGITransport(app=upstream), base_url="http://comfy"
     )
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=service_app), base_url="http://test")
+
+
+@contextlib.contextmanager
+def service_workflow(service: str):
+    """Import one service's `workflow` module, then put `sys.modules` back.
+
+    Every service ships a top-level `workflow`, `server` and `app`, and pytest
+    collects them all in one interpreter, so borrowing the name has to be undone
+    or the next suite silently tests this one's graph. See flux2klein/AGENTS.md.
+    """
+    directory = str(Path(__file__).resolve().parents[1] / service)
+    saved = {name: sys.modules.pop(name, None) for name in ("workflow", "server", "app")}
+    sys.path.insert(0, directory)
+    try:
+        yield importlib.import_module("workflow")
+    finally:
+        sys.path.remove(directory)
+        sys.modules.pop("workflow", None)
+        for name, module in saved.items():
+            if module is not None:
+                sys.modules[name] = module

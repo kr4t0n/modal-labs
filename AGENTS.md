@@ -29,7 +29,8 @@ directories, not installable packages:
 ```
 modal-labs/
 ├── pyproject.toml        one environment, ruff + pytest config
-├── comfyui_modal/        shared: image, supervisor, ASGI proxy, CLI, test doubles
+├── comfyui_modal/        shared: image, supervisor, ASGI proxy, graph fragments,
+│                         CLI, weight fetching, test doubles
 ├── comfy_node/           shared: one ComfyUI node package for every service
 ├── tests/                tests for the shared code
 ├── .github/workflows/    lint, format, test, import-check every Modal app
@@ -98,6 +99,26 @@ because every service defines modules named `app`, `server` and `workflow`.
 Within pytest the same collision is handled by each test module clearing those
 names from `sys.modules` before importing, plus a guard test asserting it bound
 its own project's copy. Without it a suite silently tests the wrong project.
+
+## Getting caller-supplied media into a graph
+
+`LoadImage` names a file in ComfyUI's input directory, so bytes have to be there
+before a graph can reference them. `ModelService.upload_fields` names the request
+fields carrying base64; `run_generation` uploads each through ComfyUI's own
+`/upload/image` and **replaces the field with the filenames ComfyUI returns**
+before `resolve` runs. A field may be one image or a list of them, and its shape
+is preserved.
+
+Two rules, both learned the hard way rather than guessed:
+
+* Reference the name ComfyUI reports back, never the one sent. It renames on
+  collision, so the sent name may belong to someone else's file.
+* Upload before the `duration_s` clock starts. It is transport, not render time,
+  and a service with no `upload_fields` makes no extra call at all.
+
+`comfyui_modal/graph.py` holds the graph fragments that are genuinely
+architecture-independent — currently the img2img source chain, which six
+services splice identically. Anything model-specific stays in the service.
 
 ## Guarding the shared layer
 

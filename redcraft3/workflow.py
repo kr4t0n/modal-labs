@@ -21,6 +21,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from comfyui_modal import graph as graph_fragments
 from comfyui_modal.geometry import (
     ASPECT_RATIOS,
     MAX_SEED,
@@ -99,9 +100,23 @@ class GenerationParams:
     scheduler: str
     denoise: float
     filename_prefix: str
+    # A ComfyUI input-directory filename, already uploaded. Set makes this
+    # img2img: the sampler starts from this image instead of an empty latent.
+    source_image: str | None = None
+    source_megapixels: float = 1.0
+
+    @property
+    def is_img2img(self) -> bool:
+        return self.source_image is not None
 
     def as_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        data["is_img2img"] = self.is_img2img
+        if self.is_img2img:
+            # The encoded source defines the latent, so these were never
+            # applied. Reporting them anyway would make `params` a lie.
+            data["width"] = data["height"] = None
+        return data
 
 
 def resolve_params(
@@ -117,6 +132,8 @@ def resolve_params(
     sampler_name: str = DEFAULT_SAMPLER,
     scheduler: str = DEFAULT_SCHEDULER,
     denoise: float = 1.0,
+    source_image: str | None = None,
+    source_megapixels: float = 1.0,
     filename_prefix: str = "redcraft3",
 ) -> GenerationParams:
     """Validate and snap the request into a fully specified parameter set."""
@@ -128,6 +145,12 @@ def resolve_params(
         raise WorkflowError("steps must be at least 1")
     if not 0.0 <= denoise <= 1.0:
         raise WorkflowError("denoise must be between 0 and 1")
+    if not 0.01 <= source_megapixels <= 16.0:
+        raise WorkflowError("source_megapixels must be between 0.01 and 16")
+    if source_image is not None and batch_size != 1:
+        # One encoded source is one starting latent, so a batch would be N
+        # copies of the same img2img. Refuse rather than surprise.
+        raise WorkflowError("batch_size must be 1 for img2img; the source fixes the latent")
 
     return GenerationParams(
         prompt=prompt,
@@ -142,6 +165,8 @@ def resolve_params(
         scheduler=scheduler,
         denoise=float(denoise),
         filename_prefix=filename_prefix,
+        source_image=source_image,
+        source_megapixels=float(source_megapixels),
     )
 
 
@@ -216,6 +241,13 @@ def build_workflow(params: GenerationParams) -> dict[str, Any]:
             "_meta": {"title": "Save"},
         },
     }
+    if params.is_img2img:
+        graph_fragments.splice_img2img_source(
+            graph,
+            filename=params.source_image,
+            megapixels=params.source_megapixels,
+        )
+
     return graph
 
 

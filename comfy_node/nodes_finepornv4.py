@@ -10,6 +10,7 @@ from ._runtime import (
     common_geometry_inputs,
     endpoint,
     endpoint_inputs,
+    from_tensor,
     geometry_payload,
     post,
     to_tensor,
@@ -85,8 +86,37 @@ class FinePornV4Modal:
                 ),
                 "sampler_name": (SAMPLERS, {"default": "euler"}),
                 "scheduler": (SCHEDULERS, {"default": "beta"}),
+                "denoise": (
+                    "FLOAT",
+                    {
+                        "default": 1.0,
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.01,
+                        "tooltip": (
+                            "Only sent when source_image is connected. 1.0 "
+                            "re-noises the source completely, which is "
+                            "text-to-image at the source's size; lower it to "
+                            "keep more of the original."
+                        ),
+                    },
+                ),
             },
-            "optional": endpoint_inputs(ENV_URL),
+            # Optional, so the node stays a pure source when nothing is wired
+            # in and every saved text-to-image workflow keeps working.
+            "optional": {
+                "source_image": (
+                    "IMAGE",
+                    {
+                        "tooltip": (
+                            "Connect an image to switch to img2img. The output "
+                            "size then follows the source, not the width/height "
+                            "widgets, and `denoise` starts taking effect."
+                        ),
+                    },
+                ),
+                **endpoint_inputs(ENV_URL),
+            },
             # Lets the progress bar attach to this node rather than the graph.
             "hidden": {"unique_id": "UNIQUE_ID"},
         }
@@ -111,6 +141,8 @@ class FinePornV4Modal:
         cfg: float,
         sampler_name: str,
         scheduler: str,
+        denoise: float = 1.0,
+        source_image=None,
         endpoint: str = "",
         timeout_s: float = 900.0,
         unique_id: str | None = None,
@@ -133,6 +165,14 @@ class FinePornV4Modal:
             **geometry_payload(aspect_ratio, megapixels, width, height),
         }
 
+        # Only when a source is wired in: against an empty latent a denoise
+        # below 1 just underbakes, so sending it would be a footgun.
+        if source_image is not None and len(source_image):
+            payload["source_image"] = from_tensor(source_image[:1])[0]
+            payload["denoise"] = denoise
+            # One encoded source is one latent; the batch widget cannot apply.
+            payload["batch_size"] = 1
+
         with ProgressMirror(url, client_id, unique_id):
             result = post(url, "/generate", payload, timeout_s)
 
@@ -143,10 +183,17 @@ class FinePornV4Modal:
         info = (
             f"seed={params.get('seed')} steps={params.get('steps')} "
             f"cfg={params.get('cfg')} {params.get('sampler_name')}/{params.get('scheduler')} "
-            f"{params.get('width')}x{params.get('height')} "
+            f"{_size_note(params)} "
             f"in {result.get('duration_s')}s{notes}"
         )
         return (to_tensor(result["images"]), int(params.get("seed", seed)), info)
+
+
+def _size_note(params: dict) -> str:
+    """The server reports width/height as None on an img2img render."""
+    if params.get("is_img2img"):
+        return f"from source at denoise {params.get('denoise')}"
+    return f"{params.get('width')}x{params.get('height')}"
 
 
 def _endpoint_url(override: str) -> str:

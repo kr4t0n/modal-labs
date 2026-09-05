@@ -200,6 +200,20 @@ Its Civitai listing is headlined by a *video* model ("H3 Director Edition") and
 quotes 6-10 steps; that belongs to a different base model on the same page and
 does not apply. This node renders stills.
 
+Every node except **FLUX.2 klein** now has an optional `source_image` input and
+a `denoise` widget for **img2img**: connect an image and the sampler starts from
+it rather than an empty latent, with `denoise` deciding how much survives.
+Unconnected, nothing changes — `denoise` is not even sent, since below 1 against
+an empty latent it would only underbake.
+
+klein's input is called `reference_image` rather than `source_image` on purpose.
+It *conditions* generation from an empty latent, so `denoise` does not apply;
+the others *start* from the encoded image. Same widget shape, different
+mechanism.
+
+In both cases the output size follows the supplied image and `batch_size` drops
+to 1.
+
 For all render nodes, set `aspect_ratio` to `custom` to use the width/height
 widgets, and use the optional `endpoint` widget to override the environment if
 you run more than one deployment of a service.

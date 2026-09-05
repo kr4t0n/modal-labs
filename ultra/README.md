@@ -102,6 +102,42 @@ At the default `cfg 1` the negative branch is never consulted, so the graph
 zeroes it exactly as the reference template does. Supplying `negative_prompt`
 swaps in a real encoder, which only does anything if you also raise `cfg`.
 
+## img2img
+
+Supply a source image and the sampler starts from it instead of an empty
+latent. `denoise` then controls how much of the original survives — it is inert
+without a source, which is why it only takes effect here.
+
+```bash
+uv run python client.py generate "make it dusk" --source photo.png --denoise 0.55
+```
+
+Or over the API, base64-encoded:
+
+```json
+{"prompt": "make it dusk", "source_image": "iVBORw0KGgo...", "denoise": 0.55}
+```
+
+In ComfyUI, connect anything producing an `IMAGE` to the node's optional
+`source_image` input. Leave it unconnected and the node stays text-to-image, so
+saved workflows are unaffected.
+
+Three things change once a source is present:
+
+- **The source sets the output size.** `width`, `height` and `aspect_ratio` are
+  ignored; the image is scaled to `source_megapixels` and its dimensions drive
+  the render. The response reports `width`/`height` as `null` and
+  `is_img2img: true` rather than echoing values that were never applied.
+- **`batch_size` must be 1.** One encoded source is one starting latent.
+- **Steps are not reduced.** ComfyUI builds a `steps / denoise` schedule and
+  keeps the last `steps + 1` sigmas, so 8 steps at `denoise 0.5` still samples
+  8 times. No need to raise `steps` to compensate.
+
+> **Unmeasured.** Krea 2 publishes no img2img recipe — the graph is standard
+> ComfyUI img2img, but which `denoise` values look good on a turbo finetune at
+> cfg 1 has not been measured here. Expect to find the usable band yourself; if
+> you do, write it into this file.
+
 ## API reference
 
 `POST /generate` — all fields optional except `prompt`:
@@ -116,7 +152,9 @@ swaps in a real encoder, which only does anything if you also raise `cfg`.
 | `cfg` | 1.0 | |
 | `sampler_name` | `euler` | Any ComfyUI sampler |
 | `scheduler` | `simple` | Any ComfyUI scheduler |
-| `denoise` | 1.0 | |
+| `denoise` | 1.0 | Only meaningful with `source_image` |
+| `source_image` | — | Base64 image to start from; see [img2img](#img2img) |
+| `source_megapixels` | 1.0 | The source is scaled to this before encoding |
 | `seed` | random | |
 | `batch_size` | 1 | 1–8 |
 | `client_id` | generated | Subscribe to `/ws?clientId=<id>` for progress |

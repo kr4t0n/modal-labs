@@ -13,16 +13,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import importlib
-import sys
 import time
-from pathlib import Path
 from typing import ClassVar
 
 import pytest
 from aiohttp import web
 
-from comfyui_modal.testing import install_comfyui_stubs
+from comfyui_modal.testing import install_comfyui_stubs, service_workflow
 
 
 class RecordingProgressBar:
@@ -110,6 +107,7 @@ def test_every_service_registers_its_node():
                 "cfg",
                 "sampler_name",
                 "scheduler",
+                "denoise",
             ],
         ),
         (
@@ -127,6 +125,7 @@ def test_every_service_registers_its_node():
                 "cfg",
                 "sampler_name",
                 "scheduler",
+                "denoise",
             ],
         ),
         (
@@ -144,6 +143,7 @@ def test_every_service_registers_its_node():
                 "cfg",
                 "sampler_name",
                 "scheduler",
+                "denoise",
             ],
         ),
         (
@@ -161,6 +161,7 @@ def test_every_service_registers_its_node():
                 "cfg",
                 "sampler_name",
                 "scheduler",
+                "denoise",
             ],
         ),
         (
@@ -178,6 +179,7 @@ def test_every_service_registers_its_node():
                 "cfg",
                 "sampler_name",
                 "scheduler",
+                "denoise",
             ],
         ),
         (
@@ -196,6 +198,7 @@ def test_every_service_registers_its_node():
                 "sampler_name",
                 "scheduler",
                 "shift",
+                "denoise",
             ],
         ),
     ],
@@ -212,13 +215,16 @@ def test_widget_names_and_order_are_stable(node_id, expected):
 @pytest.mark.parametrize(
     ("node_id", "extra"),
     [
+        # klein conditions from an empty latent, so its input is a *reference*;
+        # the rest start sampling from the encoded image, so theirs is a
+        # *source*. Same widget shape, different mechanism — hence the names.
         ("Flux2KleinModal", {"reference_image"}),
-        ("UltraModal", set()),
-        ("ZImageTurboStableYogiModal", set()),
-        ("FinePornV4Modal", set()),
-        ("RedGPT2GPTModal", set()),
-        ("RedCraft3Modal", set()),
-        ("DarkBeast3Modal", set()),
+        ("UltraModal", {"source_image"}),
+        ("ZImageTurboStableYogiModal", {"source_image"}),
+        ("FinePornV4Modal", {"source_image"}),
+        ("RedGPT2GPTModal", {"source_image"}),
+        ("RedCraft3Modal", {"source_image"}),
+        ("DarkBeast3Modal", {"source_image"}),
     ],
 )
 def test_optional_inputs_beyond_transport_are_pinned(node_id, extra):
@@ -430,27 +436,6 @@ def test_progress_bar_without_node_id_support():
 # would block the boot and fail whenever the endpoint is down. That makes the
 # lists a hand-maintained mirror, and drift is silent until a render fails with
 # `unknown lora`. These tests are the thing that notices.
-
-
-@contextlib.contextmanager
-def service_workflow(service: str):
-    """Import one service's `workflow` module, then put `sys.modules` back.
-
-    Every service ships a top-level `workflow`, `server` and `app`, and pytest
-    collects them all in one interpreter, so borrowing the name has to be undone
-    or the next suite silently tests this one's graph. See flux2klein/AGENTS.md.
-    """
-    directory = str(Path(__file__).resolve().parents[1] / service)
-    saved = {name: sys.modules.pop(name, None) for name in ("workflow", "server", "app")}
-    sys.path.insert(0, directory)
-    try:
-        yield importlib.import_module("workflow")
-    finally:
-        sys.path.remove(directory)
-        sys.modules.pop("workflow", None)
-        for name, module in saved.items():
-            if module is not None:
-                sys.modules[name] = module
 
 
 def test_node_adapter_names_match_the_service_registry():

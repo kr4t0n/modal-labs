@@ -32,7 +32,32 @@ class GenerateRequest(BaseGenerateRequest):
         le=100.0,
         description="ModelSamplingAuraFlow shift. 3.0 is what Z-Image declares.",
     )
-    denoise: float = Field(default=1.0, ge=0.0, le=1.0)
+    denoise: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "How far the source is re-noised. Only meaningful with source_image; "
+            "against an empty latent anything below 1 just underbakes."
+        ),
+    )
+
+    # Base64 on the way in; the shared layer uploads it to ComfyUI and replaces
+    # this with the input-directory filename before `_resolve` runs.
+    source_image: str | None = Field(
+        default=None,
+        description=(
+            "Base64 image to start from. Supplying one turns this into img2img: "
+            "the output size comes from the source rather than width/height, "
+            "batch_size must be 1, and `denoise` finally does something."
+        ),
+    )
+    source_megapixels: float = Field(
+        default=1.0,
+        ge=0.01,
+        le=16.0,
+        description="The source is scaled to this budget before encoding. Ignored without one.",
+    )
 
     sampler_name: str = workflow.DEFAULT_SAMPLER
     filename_prefix: str = "zimageturbostableyogi"
@@ -54,6 +79,9 @@ def _resolve(request: GenerateRequest) -> workflow.GenerationParams:
         shift=request.shift,
         denoise=request.denoise,
         filename_prefix=request.filename_prefix,
+        # A filename by now, not base64 — see `upload_fields`.
+        source_image=request.source_image,
+        source_megapixels=request.source_megapixels,
     )
 
 
@@ -64,6 +92,7 @@ SERVICE = ModelService(
     resolve=_resolve,
     build_workflow=workflow.build_workflow,
     output_node_id=workflow.OUTPUT_NODE_ID,
+    upload_fields=("source_image",),
 )
 
 
